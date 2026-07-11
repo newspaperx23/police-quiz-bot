@@ -55,12 +55,13 @@ export default function DashboardPage() {
   const [bulkGenerating, setBulkGenerating] = useState(false);
   const [bulkProgress, setBulkProgress] = useState(0);
   const [bulkStatusText, setBulkStatusText] = useState<string | null>(null);
+  const [showBulkConfirm, setShowBulkConfirm] = useState(false);
 
-  const generateBulkQuizzes = async () => {
-    if (!confirm("คุณต้องการสั่งให้ AI ออกข้อสอบเพิ่มทุกวิชา วิชาละ 50 ข้อใช่หรือไม่?\n(ระบบจะแบ่งทำทีละ 10 ข้อทั้งหมด 30 รอบเพื่อป้องกันปัญหาเซิร์ฟเวอร์หลุด และจะป้องกันไม่ให้ซ้ำกับข้อสอบเดิมในระบบด้วย โดยจะใช้เวลาประมาณ 2-3 นาที)")) {
-      return;
-    }
+  const generateBulkQuizzes = () => {
+    setShowBulkConfirm(true);
+  };
 
+  const startBulkGeneration = async () => {
     const subjects = ["ความสามารถทั่วไป", "ภาษาไทย", "ภาษาอังกฤษ", "คอมพิวเตอร์", "กฎหมาย", "สังคม"];
     const totalSteps = subjects.length * 5; // 6 subjects * 5 batches = 30 steps
     let currentStep = 0;
@@ -540,6 +541,78 @@ export default function DashboardPage() {
           </p>
         </div>
       </footer>
+
+      {/* ─── Bulk Confirm Modal ────────────────── */}
+      {showBulkConfirm && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: "rgba(0, 0, 0, 0.8)",
+          backdropFilter: "blur(6px)",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          zIndex: 9999,
+        }}>
+          <div style={{
+            background: "#121318",
+            border: "1px solid rgba(255, 255, 255, 0.08)",
+            borderRadius: "16px",
+            padding: "30px 25px",
+            maxWidth: "420px",
+            width: "90%",
+            boxShadow: "0 20px 40px rgba(0, 0, 0, 0.6)",
+            textAlign: "center"
+          }}>
+            <div style={{ fontSize: "40px", marginBottom: "15px" }}>🔥</div>
+            <h3 style={{ fontSize: "18px", fontWeight: "600", color: "#ffffff", marginBottom: "10px" }}>
+              ยืนยันการออกข้อสอบชุดใหญ่
+            </h3>
+            <p style={{ fontSize: "13px", color: "rgba(255, 255, 255, 0.6)", lineHeight: "1.6", marginBottom: "24px" }}>
+              คุณต้องการสั่งให้ AI ออกข้อสอบเพิ่มทุกวิชา วิชาละ 50 ข้อใช่หรือไม่?<br/>
+              <span style={{ color: "#3b82f6", display: "block", marginTop: "8px", fontWeight: "500" }}>
+                * ระบบจะทำงานทั้งหมด 30 รอบ รอบละ 10 ข้อ (รวมเป็น 300 ข้อ) เพื่อความปลอดภัยและคัดกรองโจทย์ซ้ำโดยสมบูรณ์
+              </span>
+            </p>
+            <div style={{ display: "flex", gap: "10px", justifyContent: "center" }}>
+              <button
+                onClick={() => {
+                  setShowBulkConfirm(false);
+                  startBulkGeneration();
+                }}
+                style={{
+                  background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                  color: "#ffffff",
+                  border: "none",
+                  padding: "10px 20px",
+                  borderRadius: "8px",
+                  fontWeight: "600",
+                  cursor: "pointer"
+                }}
+              >
+                ยืนยันเริ่มออกข้อสอบ
+              </button>
+              <button
+                onClick={() => setShowBulkConfirm(false)}
+                style={{
+                  background: "rgba(255, 255, 255, 0.05)",
+                  color: "#ffffff",
+                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  padding: "10px 20px",
+                  borderRadius: "8px",
+                  fontWeight: "600",
+                  cursor: "pointer"
+                }}
+              >
+                ยกเลิก
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
