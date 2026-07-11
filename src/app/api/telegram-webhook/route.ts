@@ -85,6 +85,30 @@ export async function POST(request: NextRequest) {
             answeredAt: new Date(),
           });
 
+          // ─── Spaced Repetition (incorrect_quizzes handling) ───
+          if (pollData.quizId) {
+            const incorrectQuizRef = db
+              .collection("users")
+              .doc(chatId)
+              .collection("incorrect_quizzes")
+              .doc(pollData.quizId);
+
+            if (isCorrect) {
+              if (pollData.isReview) {
+                await incorrectQuizRef.delete();
+                console.log(`User ${chatId} answered review quiz ${pollData.quizId} correctly. Deleted from incorrect list.`);
+              }
+            } else {
+              await incorrectQuizRef.set({
+                quizId: pollData.quizId,
+                subject: pollData.subject || "unknown",
+                incorrectCount: FieldValue.increment(1),
+                lastAttemptAt: new Date(),
+              }, { merge: true });
+              console.log(`User ${chatId} answered quiz ${pollData.quizId} incorrectly. Saved/updated in incorrect list.`);
+            }
+          }
+
           // Send feedback message to the user
           if (isCorrect) {
             await sendMessage(chatId, "🎉 <b>ถูกต้องนะครับ!</b> เก่งมากครับ 👏", "HTML");

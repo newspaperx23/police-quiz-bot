@@ -64,6 +64,12 @@ ${quiz.options.map((opt, idx) => `${idx}. ${opt}`).join("\n")}
  */
 export async function GET(request: Request) {
   try {
+    // Auth Check
+    const authHeader = request.headers.get("authorization");
+    if (!authHeader || authHeader !== "Bearer !159951zZ") {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const subjectParam = searchParams.get("subject");
     const countParam = parseInt(searchParams.get("count") || "5", 10);

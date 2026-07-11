@@ -78,46 +78,92 @@ export async function sendIndividualQuiz(
       return false;
     }
 
-    // ─── Try to get from global_quizzes pool first ────
+    // ─── Try Spaced Repetition First (20% chance) ─────
     let quiz: QuizQuestion | null = null;
     let quizId: string | null = null;
     let isFromPool = false;
+    let isReview = false;
 
     const userRef = db.collection("users").doc(chatId);
     const userDoc = await userRef.get();
     const userData = userDoc.exists ? userDoc.data() : null;
     const answeredQuizIds: string[] = userData?.answeredQuizIds || [];
 
-    try {
-      const poolSnapshot = await db
-        .collection("global_quizzes")
-        .where("subject", "==", subject)
-        .limit(100)
-        .get();
-
-      if (!poolSnapshot.empty) {
-        const unusedQuizzes = poolSnapshot.docs.filter(
-          (doc) => !answeredQuizIds.includes(doc.id)
-        );
-
-        if (unusedQuizzes.length > 0) {
-          // Pick a random quiz from the unused ones
-          const selectedDoc = unusedQuizzes[Math.floor(Math.random() * unusedQuizzes.length)];
-          const data = selectedDoc.data();
-          quiz = {
-            question: data.question,
-            options: data.options,
-            correct_option_id: data.correct_option_id,
-            hint: data.hint,
-            explanation: data.explanation,
-          };
-          quizId = selectedDoc.id;
-          isFromPool = true;
-          console.log(`Successfully retrieved quiz ${quizId} from global_quizzes pool for user ${chatId}`);
+    const incorrectQuizzesRef = db.collection("users").doc(chatId).collection("incorrect_quizzes");
+    
+    if (Math.random() < 0.20) {
+      try {
+        const incorrectSnapshot = await incorrectQuizzesRef.limit(10).get();
+        if (!incorrectSnapshot.empty) {
+          // Pick a random incorrect quiz
+          const selectedIncorrect = incorrectSnapshot.docs[Math.floor(Math.random() * incorrectSnapshot.size)];
+          const incorrectData = selectedIncorrect.data();
+          const targetQuizId = incorrectData.quizId;
+          
+          if (targetQuizId) {
+            const globalDoc = await db.collection("global_quizzes").doc(targetQuizId).get();
+            if (globalDoc.exists) {
+              const data = globalDoc.data();
+              if (data) {
+                quiz = {
+                  question: data.question,
+                  options: data.options,
+                  correct_option_id: data.correct_option_id,
+                  hint: data.hint,
+                  explanation: data.explanation,
+                };
+                quizId = targetQuizId;
+                isFromPool = true;
+                isReview = true;
+                console.log(`[Spaced Repetition] Selected quiz ${quizId} for user ${chatId}`);
+              }
+            } else {
+              // Delete stale review ref
+              await selectedIncorrect.ref.delete();
+            }
+          }
         }
+      } catch (spacedErr) {
+        console.error("Spaced repetition query failed, falling back to normal:", spacedErr);
       }
-    } catch (poolErr) {
-      console.error("Error fetching quiz from global pool:", poolErr);
+    }
+
+    // ─── Try to get from global_quizzes pool if not review ────
+    if (!quiz) {
+      try {
+        // Pool Exhaustion Fix: Use select() to fetch only IDs and scale properly
+        const poolSnapshot = await db
+          .collection("global_quizzes")
+          .where("subject", "==", subject)
+          .select()
+          .get();
+
+        if (!poolSnapshot.empty) {
+          const unusedQuizzes = poolSnapshot.docs.filter(
+            (doc) => !answeredQuizIds.includes(doc.id)
+          );
+
+          if (unusedQuizzes.length > 0) {
+            const selectedDoc = unusedQuizzes[Math.floor(Math.random() * unusedQuizzes.length)];
+            const fullDoc = await selectedDoc.ref.get();
+            const data = fullDoc.data();
+            if (data) {
+              quiz = {
+                question: data.question,
+                options: data.options,
+                correct_option_id: data.correct_option_id,
+                hint: data.hint,
+                explanation: data.explanation,
+              };
+              quizId = selectedDoc.id;
+              isFromPool = true;
+              console.log(`Successfully retrieved quiz ${quizId} from global_quizzes pool for user ${chatId}`);
+            }
+          }
+        }
+      } catch (poolErr) {
+        console.error("Error fetching quiz from global pool:", poolErr);
+      }
     }
 
     // ─── Fallback to OpenAI generator ────────────────
@@ -142,7 +188,7 @@ export async function sendIndividualQuiz(
         console.error("Failed to fetch quiz history for duplication check:", err);
       }
 
-      // Generate question via OpenAI with strict answer verification
+      // Generate question via OpenAI with strict answer verification and 3 retries
       const prompt = `คุณคืออาจารย์ผู้ออกข้อสอบคัดเลือกนายสิบตำรวจไทย (สายอำนวยการ)
 วิชา: ${subject}
 ขอบเขตเนื้อหา: ${syllabus}
@@ -167,70 +213,86 @@ export async function sendIndividualQuiz(
 - ก่อนตอบ ให้ตรวจสอบซ้ำว่า correct_option_id ชี้ไปที่คำตอบที่ถูกจริง
 - ห้ามถามซ้ำ ให้เปลี่ยนหัวข้อย่อยทุกครั้ง${pastQuestionsText}`;
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
-        response_format: { type: "json_object" },
-        temperature: 0.7,
-        max_tokens: 1000,
-      });
+      let attempts = 0;
+      const maxAttempts = 3;
+      while (attempts < maxAttempts) {
+        attempts++;
+        try {
+          const completion = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [{ role: "user", content: prompt }],
+            response_format: { type: "json_object" },
+            temperature: 0.7,
+            max_tokens: 1000,
+          });
 
-      const raw = completion.choices[0]?.message?.content;
-      if (!raw) {
-        console.error(`Empty OpenAI response for user ${chatId}`);
-        return false;
-      }
-
-      const parsedQuiz = JSON.parse(raw);
-
-      // Validate structure
-      if (
-        !parsedQuiz.question ||
-        !parsedQuiz.options ||
-        parsedQuiz.options.length !== 4 ||
-        parsedQuiz.correct_option_id === undefined ||
-        typeof parsedQuiz.correct_option_id !== "number" ||
-        parsedQuiz.correct_option_id < 0 ||
-        parsedQuiz.correct_option_id > 3
-      ) {
-        console.error(`Invalid quiz structure for user ${chatId}:`, raw);
-        return false;
-      }
-
-      // ─── Cross-check correct_answer_text ────
-      if (parsedQuiz.correct_answer_text) {
-        const expectedText = parsedQuiz.options[parsedQuiz.correct_option_id];
-        if (expectedText && parsedQuiz.correct_answer_text.trim() !== expectedText.trim()) {
-          const matchIdx = parsedQuiz.options.findIndex(
-            (opt: string) => opt.trim() === parsedQuiz.correct_answer_text.trim()
-          );
-          if (matchIdx >= 0 && matchIdx !== parsedQuiz.correct_option_id) {
-            console.warn(
-              `Realtime quiz answer mismatch! "${parsedQuiz.question.slice(0, 50)}" ` +
-              `Index ${parsedQuiz.correct_option_id} -> corrected to ${matchIdx}`
-            );
-            parsedQuiz.correct_option_id = matchIdx;
+          const raw = completion.choices[0]?.message?.content;
+          if (!raw) {
+            console.error(`Empty OpenAI response for user ${chatId} (attempt ${attempts})`);
+            continue;
           }
+
+          const parsedQuiz = JSON.parse(raw);
+
+          // Validate structure
+          if (
+            !parsedQuiz.question ||
+            !parsedQuiz.options ||
+            parsedQuiz.options.length !== 4 ||
+            parsedQuiz.correct_option_id === undefined ||
+            typeof parsedQuiz.correct_option_id !== "number" ||
+            parsedQuiz.correct_option_id < 0 ||
+            parsedQuiz.correct_option_id > 3
+          ) {
+            console.error(`Invalid quiz structure (attempt ${attempts}):`, raw);
+            continue;
+          }
+
+          // Cross-check correct_answer_text
+          if (parsedQuiz.correct_answer_text) {
+            const expectedText = parsedQuiz.options[parsedQuiz.correct_option_id];
+            if (expectedText && parsedQuiz.correct_answer_text.trim() !== expectedText.trim()) {
+              const matchIdx = parsedQuiz.options.findIndex(
+                (opt: string) => opt.trim() === parsedQuiz.correct_answer_text.trim()
+              );
+              if (matchIdx >= 0 && matchIdx !== parsedQuiz.correct_option_id) {
+                parsedQuiz.correct_option_id = matchIdx;
+              }
+            }
+          }
+
+          // Independent verification
+          const verifiedId = await verifyQuizAnswer(openai, parsedQuiz);
+          if (verifiedId < 0) {
+            console.warn(`Verification failed for realtime quiz (attempt ${attempts})`);
+            continue; // retry
+          }
+
+          if (verifiedId !== parsedQuiz.correct_option_id) {
+            console.warn(
+              `Verification override for realtime quiz: "${parsedQuiz.question.slice(0, 50)}" ` +
+              `Original: ${parsedQuiz.correct_option_id}, Verified: ${verifiedId}`
+            );
+            parsedQuiz.correct_option_id = verifiedId;
+          }
+
+          quiz = {
+            question: parsedQuiz.question,
+            options: parsedQuiz.options,
+            correct_option_id: parsedQuiz.correct_option_id,
+            hint: parsedQuiz.hint || "ไม่มีคำใบ้",
+            explanation: parsedQuiz.explanation || "ไม่มีคำอธิบายเพิ่มเติม",
+          };
+          break; // success
+        } catch (err) {
+          console.error(`Error in OpenAI generation attempt ${attempts}:`, err);
         }
       }
 
-      // ─── Independent verification ────
-      const verifiedId = await verifyQuizAnswer(openai, parsedQuiz);
-      if (verifiedId >= 0 && verifiedId !== parsedQuiz.correct_option_id) {
-        console.warn(
-          `Verification override for realtime quiz: "${parsedQuiz.question.slice(0, 50)}" ` +
-          `Original: ${parsedQuiz.correct_option_id}, Verified: ${verifiedId}`
-        );
-        parsedQuiz.correct_option_id = verifiedId;
+      if (!quiz) {
+        console.error(`Failed to generate verified quiz after ${maxAttempts} attempts`);
+        return false;
       }
-
-      quiz = {
-        question: parsedQuiz.question,
-        options: parsedQuiz.options,
-        correct_option_id: parsedQuiz.correct_option_id,
-        hint: parsedQuiz.hint || "ไม่มีคำใบ้",
-        explanation: parsedQuiz.explanation || "ไม่มีคำอธิบายเพิ่มเติม",
-      };
 
       // Save this newly generated quiz to the global pool so other users can reuse it!
       try {
@@ -253,8 +315,11 @@ export async function sendIndividualQuiz(
 
     // ─── Send hint message (MarkdownV2 spoiler) ────
     const escapedHint = escapeMarkdownV2(quiz.hint || "ไม่มีคำใบ้");
-    const hintMessage =
-      `📝 *${escapeMarkdownV2(subject)}*\n\n` +
+    let hintMessage = "";
+    if (isReview) {
+      hintMessage += `🔄 *\\[ทบทวนข้อที่เคยทำผิด\\]*\n\n`;
+    }
+    hintMessage += `📝 *${escapeMarkdownV2(subject)}*\n\n` +
       `💡 คำใบ้: ||${escapedHint}||`;
 
     await sendMessage(chatId, hintMessage);
@@ -278,6 +343,9 @@ export async function sendIndividualQuiz(
         correctOptionId: quiz.correct_option_id,
         sentAt: new Date(),
         answered: false,
+        quizId: quizId || null,
+        subject,
+        isReview: isReview,
       });
     }
 

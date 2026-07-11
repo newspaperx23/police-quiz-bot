@@ -15,6 +15,12 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(request: Request) {
   try {
+    // Auth Check
+    const authHeader = request.headers.get("authorization");
+    if (!authHeader || authHeader !== "Bearer !159951zZ") {
+      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const subjectFilter = searchParams.get("subject");
     const limitParam = parseInt(searchParams.get("limit") || "5", 10);

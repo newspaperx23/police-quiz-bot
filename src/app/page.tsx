@@ -27,6 +27,11 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [password, setPassword] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [enteredPassword, setEnteredPassword] = useState("");
+
   const [generating, setGenerating] = useState(false);
   const [selectedPoolSubject, setSelectedPoolSubject] = useState("ความสามารถทั่วไป");
   const [generationMsg, setGenerationMsg] = useState<string | null>(null);
@@ -35,12 +40,21 @@ export default function DashboardPage() {
     try {
       setGenerating(true);
       setGenerationMsg(null);
-      const res = await fetch(`/api/generate-pool?subject=${encodeURIComponent(selectedPoolSubject)}&count=5`);
+      const savedPassword = localStorage.getItem("admin_password") || password;
+      const res = await fetch(`/api/generate-pool?subject=${encodeURIComponent(selectedPoolSubject)}&count=5`, {
+        headers: {
+          Authorization: `Bearer ${savedPassword}`
+        }
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to generate");
       setGenerationMsg(`✅ เจนข้อสอบวิชา ${data.subject} สำเร็จ +${data.savedCount} ข้อ!`);
       // Refresh stats
-      const statsRes = await fetch(`/api/stats?t=${Date.now()}`);
+      const statsRes = await fetch(`/api/stats?t=${Date.now()}`, {
+        headers: {
+          Authorization: `Bearer ${savedPassword}`
+        }
+      });
       if (statsRes.ok) {
         const statsData = await statsRes.json();
         setStats(statsData);
@@ -71,11 +85,16 @@ export default function DashboardPage() {
     setBulkProgress(0);
 
     try {
+      const savedPassword = localStorage.getItem("admin_password") || password;
       for (const subject of subjects) {
         for (let batch = 1; batch <= 5; batch++) {
           setBulkStatusText(`กำลังออกข้อสอบวิชา "${subject}" (รอบที่ ${batch}/5)...`);
           
-          const res = await fetch(`/api/generate-pool?subject=${encodeURIComponent(subject)}&count=10`);
+          const res = await fetch(`/api/generate-pool?subject=${encodeURIComponent(subject)}&count=10`, {
+            headers: {
+              Authorization: `Bearer ${savedPassword}`
+            }
+          });
           const data = await res.json();
           if (!res.ok) {
             throw new Error(data.error || `ล้มเหลวในการออกข้อสอบวิชา ${subject} รอบที่ ${batch}`);
@@ -89,7 +108,11 @@ export default function DashboardPage() {
 
       setBulkStatusText("🎉 เจนข้อสอบใหม่ทุกวิชาสำเร็จ! วิชาละ +50 ข้อ (รวมทั้งหมด +350 ข้อ) และจัดเก็บในคลังโดยไม่มีการออกซ้ำเรียบร้อยแล้วครับ");
       // Refresh stats
-      const statsRes = await fetch(`/api/stats?t=${Date.now()}`);
+      const statsRes = await fetch(`/api/stats?t=${Date.now()}`, {
+        headers: {
+          Authorization: `Bearer ${savedPassword}`
+        }
+      });
       if (statsRes.ok) {
         const statsData = await statsRes.json();
         setStats(statsData);
@@ -117,6 +140,7 @@ export default function DashboardPage() {
     let totalChecked = 0;
 
     try {
+      const savedPassword = localStorage.getItem("admin_password") || password;
       for (let i = 0; i < subjects.length; i++) {
         const subject = subjects[i];
         let batchNum = 0;
@@ -130,6 +154,9 @@ export default function DashboardPage() {
           try {
             const res = await fetch(`/api/recheck-pool?subject=${encodeURIComponent(subject)}&limit=5`, {
               method: "POST",
+              headers: {
+                Authorization: `Bearer ${savedPassword}`
+              }
             });
             
             if (!res.ok) {
@@ -173,7 +200,11 @@ export default function DashboardPage() {
       );
 
       // Refresh stats
-      const statsRes = await fetch(`/api/stats?t=${Date.now()}`);
+      const statsRes = await fetch(`/api/stats?t=${Date.now()}`, {
+        headers: {
+          Authorization: `Bearer ${savedPassword}`
+        }
+      });
       if (statsRes.ok) {
         const statsData = await statsRes.json();
         setStats(statsData);
@@ -186,26 +217,64 @@ export default function DashboardPage() {
   };
 
   const fetchStats = useCallback(async () => {
+    const savedPassword = localStorage.getItem("admin_password") || password;
+    if (!savedPassword) {
+      setLoading(false);
+      setIsAuthenticated(false);
+      return;
+    }
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch(`/api/stats?t=${Date.now()}`);
+      const res = await fetch(`/api/stats?t=${Date.now()}`, {
+        headers: {
+          Authorization: `Bearer ${savedPassword}`
+        }
+      });
+      if (res.status === 401) {
+        setIsAuthenticated(false);
+        setAuthError("รหัสผ่านไม่ถูกต้อง");
+        localStorage.removeItem("admin_password");
+        return;
+      }
       if (!res.ok) throw new Error("Failed to fetch stats");
       const data = await res.json();
       setStats(data);
+      setIsAuthenticated(true);
+      setAuthError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setLoading(false);
     }
+  }, [password]);
+
+  const handleLogin = (enteredVal: string) => {
+    localStorage.setItem("admin_password", enteredVal);
+    setPassword(enteredVal);
+    setAuthError(null);
+    setTimeout(() => {
+      fetchStats();
+    }, 50);
+  };
+
+  useEffect(() => {
+    const saved = localStorage.getItem("admin_password");
+    if (saved) {
+      setPassword(saved);
+      setIsAuthenticated(true);
+    } else {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    fetchStats();
-    // Auto-refresh every 60 seconds
-    const interval = setInterval(fetchStats, 60000);
-    return () => clearInterval(interval);
-  }, [fetchStats]);
+    if (isAuthenticated) {
+      fetchStats();
+      const interval = setInterval(fetchStats, 60000);
+      return () => clearInterval(interval);
+    }
+  }, [fetchStats, isAuthenticated]);
 
   // ─── Helpers ──────────────────────────
   const formatDate = (iso: string | null) => {
@@ -225,7 +294,7 @@ export default function DashboardPage() {
   };
 
   // ─── Loading State ────────────────────
-  if (loading && !stats) {
+  if (loading) {
     return (
       <>
         <Navbar />
@@ -233,6 +302,79 @@ export default function DashboardPage() {
           <div className="loading-wrapper">
             <div className="loading-spinner" />
             <p className="loading-text">กำลังโหลดข้อมูล...</p>
+          </div>
+        </main>
+      </>
+    );
+  }
+
+  // ─── Password Gate State ────────────────
+  if (!isAuthenticated) {
+    return (
+      <>
+        <Navbar />
+        <main className="container" style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "70vh" }}>
+          <div style={{
+            background: "#121318",
+            border: "1px solid rgba(255, 255, 255, 0.08)",
+            borderRadius: "16px",
+            padding: "40px 30px",
+            maxWidth: "400px",
+            width: "100%",
+            boxShadow: "0 20px 40px rgba(0, 0, 0, 0.6)",
+            textAlign: "center"
+          }}>
+            <div style={{ fontSize: "48px", marginBottom: "20px" }}>🔒</div>
+            <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#ffffff", marginBottom: "10px" }}>
+              ระบบควบคุมแอดมิน
+            </h2>
+            <p style={{ fontSize: "13px", color: "rgba(255, 255, 255, 0.6)", marginBottom: "24px" }}>
+              กรุณากรอกรหัสผ่านเพื่อเข้าใช้งานระบบหลังบ้าน
+            </p>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              handleLogin(enteredPassword);
+            }}>
+              <input
+                type="password"
+                placeholder="รหัสผ่านผู้ดูแลระบบ"
+                value={enteredPassword}
+                onChange={(e) => setEnteredPassword(e.target.value)}
+                style={{
+                  width: "100%",
+                  background: "rgba(255, 255, 255, 0.05)",
+                  color: "#ffffff",
+                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  padding: "12px 16px",
+                  borderRadius: "8px",
+                  fontSize: "14px",
+                  outline: "none",
+                  marginBottom: "16px",
+                  textAlign: "center"
+                }}
+              />
+              {authError && (
+                <div style={{ color: "#ef4444", fontSize: "13px", marginBottom: "16px" }}>
+                  {authError}
+                </div>
+              )}
+              <button
+                type="submit"
+                style={{
+                  width: "100%",
+                  background: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
+                  color: "#ffffff",
+                  border: "none",
+                  padding: "12px",
+                  borderRadius: "8px",
+                  fontWeight: "600",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease"
+                }}
+              >
+                ยืนยันเข้าสู่ระบบ
+              </button>
+            </form>
           </div>
         </main>
       </>
