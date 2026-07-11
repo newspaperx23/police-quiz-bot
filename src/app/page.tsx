@@ -119,19 +119,51 @@ export default function DashboardPage() {
     try {
       for (let i = 0; i < subjects.length; i++) {
         const subject = subjects[i];
-        setRecheckStatusText(`กำลังตรวจสอบวิชา "${subject}"...`);
+        let batchNum = 0;
+        let hasMore = true;
 
-        const res = await fetch(`/api/recheck-pool?subject=${encodeURIComponent(subject)}&limit=100`, {
-          method: "POST",
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          totalFixed += data.fixed || 0;
-          totalDeleted += data.deleted || 0;
-          totalConfirmed += data.confirmed || 0;
-          totalChecked += data.checked || 0;
+        // Keep calling the API in batches of 5 until no more quizzes for this subject
+        while (hasMore) {
+          batchNum++;
+          setRecheckStatusText(`กำลังตรวจสอบวิชา "${subject}" (รอบที่ ${batchNum})...`);
+
+          try {
+            const res = await fetch(`/api/recheck-pool?subject=${encodeURIComponent(subject)}&limit=5`, {
+              method: "POST",
+            });
+            
+            if (!res.ok) {
+              const errText = await res.text();
+              console.error(`Recheck API error for ${subject}:`, errText);
+              // Skip this subject on error
+              break;
+            }
+            
+            const data = await res.json();
+            
+            if (data.success) {
+              totalFixed += data.fixed || 0;
+              totalDeleted += data.deleted || 0;
+              totalConfirmed += data.confirmed || 0;
+              totalChecked += data.checked || 0;
+            }
+
+            // If no quizzes were checked, this subject is done
+            if (!data.checked || data.checked === 0) {
+              hasMore = false;
+            }
+
+            // Safety: cap at 30 batches per subject (150 quizzes)
+            if (batchNum >= 30) {
+              hasMore = false;
+            }
+          } catch (fetchErr) {
+            console.error(`Fetch error for ${subject} batch ${batchNum}:`, fetchErr);
+            break;
+          }
         }
 
+        // Update progress based on subjects completed
         setRecheckProgress(Math.round(((i + 1) / subjects.length) * 100));
       }
 
