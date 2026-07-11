@@ -32,16 +32,13 @@ export async function sendMessage(
   }
 }
 
-/**
- * Send a quiz-type poll via Telegram Bot API.
- */
 export async function sendQuizPoll(
   chatId: string,
   question: string,
   options: string[],
   correctOptionId: number,
   explanation?: string
-): Promise<void> {
+): Promise<string | null> {
   const res = await fetch(`${TELEGRAM_API}/sendPoll`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -59,5 +56,9 @@ export async function sendQuizPoll(
   if (!res.ok) {
     const err = await res.text();
     console.error(`sendPoll error for chat ${chatId}:`, err);
+    return null;
   }
+
+  const data = await res.json();
+  return data.result?.poll?.id || null;
 }
