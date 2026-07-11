@@ -113,6 +113,12 @@ export async function GET() {
       subjectCounts,
       recentQuizzes,
       dailyCounts,
+      debug: {
+        hasOpenAI: !!process.env.OPENAI_API_KEY,
+        openaiLen: process.env.OPENAI_API_KEY?.length || 0,
+        hasTelegram: !!process.env.TELEGRAM_BOT_TOKEN,
+        telegramLen: process.env.TELEGRAM_BOT_TOKEN?.length || 0,
+      }
     });
   } catch (error) {
     console.error("Stats API error:", error);
