@@ -47,6 +47,7 @@ export async function sendQuizPoll(
       question,
       options: options.map((o) => ({ text: o })),
       type: "quiz",
+      is_anonymous: false,
       correct_option_id: correctOptionId,
       explanation: explanation?.slice(0, 200), // Telegram limit
       explanation_parse_mode: "HTML",
