@@ -19,10 +19,20 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
+    // Log request body to Firestore for debugging
+    try {
+      await db.collection("webhook_logs").add({
+        timestamp: new Date(),
+        body,
+      });
+    } catch (logErr) {
+      console.error("Failed to write webhook log:", logErr);
+    }
+
     // ─── Handle Poll Answer webhook update ─────────────
     const pollAnswer = body?.poll_answer;
     if (pollAnswer) {
-      const pollId = pollAnswer.poll_id;
+      const pollId = String(pollAnswer.poll_id).trim();
       const userChoice = pollAnswer.option_ids[0]; // selected option index
 
       const pollDoc = await db.collection("active_polls").doc(pollId).get();

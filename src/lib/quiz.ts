@@ -35,6 +35,23 @@ export async function sendIndividualQuiz(
       return false;
     }
 
+    // Fetch last 10 questions from history to avoid duplicates
+    let pastQuestionsText = "";
+    try {
+      const historySnapshot = await db
+        .collection("quiz_history")
+        .where("chatId", "==", chatId)
+        .orderBy("sentAt", "desc")
+        .limit(10)
+        .get();
+      if (!historySnapshot.empty) {
+        const pastQuestions = historySnapshot.docs.map((doc) => doc.data().question);
+        pastQuestionsText = `\nหลีกเลี่ยงการออกข้อสอบที่มีคำถาม ตัวเลข หรือโจทย์ซ้ำ/คล้ายคลึงกับคำถามเหล่านี้อย่างเด็ดขาด:\n${pastQuestions.map((q, idx) => `${idx + 1}. ${q}`).join("\n")}`;
+      }
+    } catch (err) {
+      console.error("Failed to fetch quiz history for duplication check:", err);
+    }
+
     // ─── Generate question via OpenAI ──────────────
     const prompt = `คุณคืออาจารย์ผู้ออกข้อสอบคัดเลือกนายสิบตำรวจไทย (สายอำนวยการ)
 วิชา: ${subject}
@@ -54,7 +71,7 @@ export async function sendIndividualQuiz(
 กฎ:
 - correct_option_id เป็น index (0-3)
 - ข้อสอบต้องเหมาะกับการสอบคัดเลือกจริง ระดับยากปานกลาง
-- ห้ามถามซ้ำ ให้เปลี่ยนหัวข้อย่อยทุกครั้ง`;
+- ห้ามถามซ้ำ ให้เปลี่ยนหัวข้อย่อยทุกครั้ง${pastQuestionsText}`;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
