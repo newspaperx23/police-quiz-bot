@@ -99,7 +99,7 @@ export async function GET() {
   } catch (error) {
     console.error("Stats API error:", error);
     return Response.json(
-      { error: "Failed to fetch stats" },
+      { error: error instanceof Error ? error.message : "Failed to fetch stats" },
       { status: 500 }
     );
   }
