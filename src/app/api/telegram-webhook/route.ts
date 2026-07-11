@@ -242,7 +242,7 @@ export async function POST(request: NextRequest) {
     if (text === "/stats") {
       const doc = await userRef.get();
       if (!doc.exists) {
-        await sendMessage(chatId, "❌ *ยังไม่พบข้อมูลผู้ใช้ในระบบ*");
+        await sendMessage(chatId, "❌ <b>ยังไม่พบข้อมูลผู้ใช้ในระบบ</b>", "HTML");
         return Response.json({ ok: true });
       }
 
@@ -257,16 +257,16 @@ export async function POST(request: NextRequest) {
       const rate = answered > 0 ? ((correct / answered) * 100).toFixed(1) : "0.0";
 
       const statsMessage =
-        `📊 *สถิติการเรียนรู้ของคุณ:*\n\n` +
-        `📚 *วิชาปัจจุบัน:* ${currentSubject}\n` +
-        `⏱️ *รอบส่งข้อสอบ:* ทุกๆ ${interval} นาที\n\n` +
-        `📝 *ข้อสอบที่ส่งแล้ว:* ${sent} ข้อ\n` +
-        `✅ *ทำแล้วตอบถูก:* ${correct} ข้อ\n` +
-        `❌ *ทำแล้วตอบผิด:* ${incorrect} ข้อ\n` +
-        `📈 *อัตราตอบถูก:* ${rate}%\n\n` +
-        `สู้ๆ นะครับ! ฝึกทำวันละนิดเพื่อเป้าหมายของคุุณ 👮‍♂️✨`;
+        `📊 <b>สถิติการเรียนรู้ของคุณ:</b>\n\n` +
+        `📚 <b>วิชาปัจจุบัน:</b> ${currentSubject}\n` +
+        `⏱️ <b>รอบส่งข้อสอบ:</b> ทุกๆ ${interval} นาที\n\n` +
+        `📝 <b>ข้อสอบที่ส่งแล้ว:</b> ${sent} ข้อ\n` +
+        `✅ <b>ทำแล้วตอบถูก:</b> ${correct} ข้อ\n` +
+        `❌ <b>ทำแล้วตอบผิด:</b> ${incorrect} ข้อ\n` +
+        `📈 <b>อัตราตอบถูก:</b> ${rate}%\n\n` +
+        `สู้ๆ นะครับ! ฝึกทำวันละนิดเพื่อเป้าหมายของคุณ 👮‍♂️✨`;
 
-      await sendMessage(chatId, statsMessage);
+      await sendMessage(chatId, statsMessage, "HTML");
       return Response.json({ ok: true });
     }
 
