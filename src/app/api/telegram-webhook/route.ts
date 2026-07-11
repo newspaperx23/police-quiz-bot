@@ -4,6 +4,7 @@ import { syllabusMap, SUBJECT_KEYS } from "@/lib/syllabus";
 import { sendMessage } from "@/lib/telegram";
 import { FieldValue } from "firebase-admin/firestore";
 import { sendIndividualQuiz } from "@/lib/quiz";
+import { sendIndividualVocabulary } from "@/lib/vocabulary";
 
 export const dynamic = "force-dynamic";
 
@@ -133,9 +134,10 @@ export async function POST(request: NextRequest) {
         `🚔 *ยินดีต้อนรับสู่ Police Quiz Bot\\!*\n\n` +
         `ระบบจะส่งข้อสอบให้คุณโดยอัตโนมัติตามเวลาที่กำหนด\n\n` +
         `📚 *วิชาที่เลือกได้:*\n${subjectList}\n\n` +
-        `🔧 *คำสั่ง:*\n` +
-        `/subject ชื่อวิชา \\- เปลี่ยนวิชา\n` +
+        `🔧 *คำสั่งที่ใช้ได้:*\n` +
+        `/subject ชื่อวิชา \\- เปลี่ยนวิชาข้อสอบ\n` +
         `/settimer นาที \\- ตั้งเวลาส่งข้อสอบ \\(เช่น /settimer 30\\)\n` +
+        `/vocab \\- รับคำศัพท์ Oxford 3000 ทันที \\(รีเซ็ตเวลา 1 ชม\\.\\)\n` +
         `/sleep \\- หยุดส่งข้อสอบชั่วคราว\n` +
         `/wake \\- เปิดรับข้อสอบอีกครั้ง\n` +
         `/help \\- ดูคู่มือคำสั่งทั้งหมด`;
@@ -166,6 +168,7 @@ export async function POST(request: NextRequest) {
         `/help \\- แสดงคู่มือแนะนำการใช้งานนี้\n` +
         `/subject \\[ชื่อวิชา\\] \\- เปลี่ยนวิชาที่ต้องการสอบเฉพาะเจาะจง\n` +
         `/settimer \\[นาที\\] \\- ตั้งระยะเวลาการส่งข้อสอบ\n` +
+        `/vocab \\- รับคำศัพท์ Oxford 3000 ทันที \\(รีเซ็ตเวลา 1 ชม\\.\\)\n` +
         `/sleep \\- หยุดส่งข้อสอบชั่วคราว (โหมดพักผ่อน)\n` +
         `/wake \\- เริ่มส่งข้อสอบต่อ (ออกจากโหมดพัก)`;
 
@@ -190,6 +193,21 @@ export async function POST(request: NextRequest) {
         chatId,
         "☀️ *ตื่นแล้ว\\!* \\- ระบบจะส่งข้อสอบให้คุณอีกครั้งทุกชั่วโมง"
       );
+      return Response.json({ ok: true });
+    }
+
+    // ─── /vocab ─────────────────────────────────────────
+    if (text === "/vocab") {
+      await sendMessage(chatId, "📖 *กำลังสุ่มคำศัพท์จาก Oxford 3000 ให้คุณ...*");
+      try {
+        const success = await sendIndividualVocabulary(chatId);
+        if (!success) {
+          await sendMessage(chatId, "❌ เกิดข้อผิดพลาดในการดึงคำศัพท์ กรุณาลองใหม่อีกครั้ง");
+        }
+      } catch (err) {
+        console.error("Instant vocabulary failed:", err);
+        await sendMessage(chatId, "❌ เกิดข้อผิดพลาดในการดึงคำศัพท์ กรุณาลองใหม่อีกครั้ง");
+      }
       return Response.json({ ok: true });
     }
 
