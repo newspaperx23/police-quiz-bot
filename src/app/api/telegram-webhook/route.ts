@@ -131,18 +131,18 @@ export async function POST(request: NextRequest) {
         .join("\n");
 
       const welcome =
-        `🚔 *ยินดีต้อนรับสู่ Police Quiz Bot\\!*\n\n` +
+        `🚔 <b>ยินดีต้อนรับสู่ Police Quiz Bot!</b>\n\n` +
         `ระบบจะส่งข้อสอบให้คุณโดยอัตโนมัติตามเวลาที่กำหนด\n\n` +
-        `📚 *วิชาที่เลือกได้:*\n${subjectList}\n\n` +
-        `🔧 *คำสั่งที่ใช้ได้:*\n` +
-        `/subject ชื่อวิชา \\- เปลี่ยนวิชาข้อสอบ\n` +
-        `/settimer นาที \\- ตั้งเวลาส่งข้อสอบ \\(เช่น /settimer 30\\)\n` +
-        `/vocab \\- รับคำศัพท์ Oxford 3000 ทันที \\(รีเซ็ตเวลา 1 ชม\\.\\)\n` +
-        `/sleep \\- หยุดส่งข้อสอบชั่วคราว\n` +
-        `/wake \\- เปิดรับข้อสอบอีกครั้ง\n` +
-        `/help \\- ดูคู่มือคำสั่งทั้งหมด`;
+        `📚 <b>วิชาที่เลือกได้:</b>\n${subjectList}\n\n` +
+        `🔧 <b>คำสั่งที่ใช้ได้:</b>\n` +
+        `/subject ชื่อวิชา - เปลี่ยนวิชาข้อสอบ\n` +
+        `/settimer นาที - ตั้งเวลาส่งข้อสอบ (เช่น /settimer 30)\n` +
+        `/vocab - รับคำศัพท์ Oxford 3000 ทันที (รีเซ็ตเวลา 1 ชม.)\n` +
+        `/sleep - หยุดส่งข้อสอบชั่วคราว\n` +
+        `/wake - เปิดรับข้อสอบอีกครั้ง\n` +
+        `/help - ดูคู่มือคำสั่งทั้งหมด`;
 
-      await sendMessage(chatId, welcome);
+      await sendMessage(chatId, welcome, "HTML");
 
       // Send a quiz immediately
       try {
@@ -161,18 +161,18 @@ export async function POST(request: NextRequest) {
         .join("\n");
 
       const helpMessage =
-        `ℹ️ *คู่มือการใช้งานบอท:*\n\n` +
-        `📚 *รายชื่อวิชาเตรียมสอบนายสิบตำรวจ (อำนวยการ):*\n${subjectList}\n\n` +
-        `🔧 *คำสั่งทั้งหมด:*\n` +
-        `/start \\- ลงทะเบียนและเปิดรับข้อสอบ\n` +
-        `/help \\- แสดงคู่มือแนะนำการใช้งานนี้\n` +
-        `/subject \\[ชื่อวิชา\\] \\- เปลี่ยนวิชาที่ต้องการสอบเฉพาะเจาะจง\n` +
-        `/settimer \\[นาที\\] \\- ตั้งระยะเวลาการส่งข้อสอบ\n` +
-        `/vocab \\- รับคำศัพท์ Oxford 3000 ทันที \\(รีเซ็ตเวลา 1 ชม\\.\\)\n` +
-        `/sleep \\- หยุดส่งข้อสอบชั่วคราว (โหมดพักผ่อน)\n` +
-        `/wake \\- เริ่มส่งข้อสอบต่อ (ออกจากโหมดพัก)`;
+        `ℹ️ <b>คู่มือการใช้งานบอท:</b>\n\n` +
+        `📚 <b>รายชื่อวิชาเตรียมสอบนายสิบตำรวจ (อำนวยการ):</b>\n${subjectList}\n\n` +
+        `🔧 <b>คำสั่งทั้งหมด:</b>\n` +
+        `/start - ลงทะเบียนและเปิดรับข้อสอบ\n` +
+        `/help - แสดงคู่มือแนะนำการใช้งานนี้\n` +
+        `/subject [ชื่อวิชา] - เปลี่ยนวิชาที่ต้องการสอบเฉพาะเจาะจง\n` +
+        `/settimer [นาที] - ตั้งระยะเวลาการส่งข้อสอบ\n` +
+        `/vocab - รับคำศัพท์ Oxford 3000 ทันที (รีเซ็ตเวลา 1 ชม.)\n` +
+        `/sleep - หยุดส่งข้อสอบชั่วคราว (โหมดพักผ่อน)\n` +
+        `/wake - เริ่มส่งข้อสอบต่อ (ออกจากโหมดพัก)`;
 
-      await sendMessage(chatId, helpMessage);
+      await sendMessage(chatId, helpMessage, "HTML");
       return Response.json({ ok: true });
     }
 
@@ -181,7 +181,8 @@ export async function POST(request: NextRequest) {
       await userRef.set({ isAwake: false }, { merge: true });
       await sendMessage(
         chatId,
-        "😴 *โหมดพัก* \\- ระบบจะหยุดส่งข้อสอบชั่วคราว\nพิมพ์ /wake เพื่อเปิดรับอีกครั้ง"
+        "😴 <b>โหมดพัก</b> - ระบบจะหยุดส่งข้อสอบชั่วคราว\nพิมพ์ /wake เพื่อเปิดรับอีกครั้ง",
+        "HTML"
       );
       return Response.json({ ok: true });
     }
@@ -191,22 +192,23 @@ export async function POST(request: NextRequest) {
       await userRef.set({ isAwake: true }, { merge: true });
       await sendMessage(
         chatId,
-        "☀️ *ตื่นแล้ว\\!* \\- ระบบจะส่งข้อสอบให้คุณอีกครั้งทุกชั่วโมง"
+        "☀️ <b>ตื่นแล้ว!</b> - ระบบจะส่งข้อสอบให้คุณอีกครั้งตามเวลาที่ตั้งไว้",
+        "HTML"
       );
       return Response.json({ ok: true });
     }
 
     // ─── /vocab ─────────────────────────────────────────
     if (text === "/vocab") {
-      await sendMessage(chatId, "📖 *กำลังสุ่มคำศัพท์จาก Oxford 3000 ให้คุณ...*");
+      await sendMessage(chatId, "📖 <b>กำลังสุ่มคำศัพท์จาก Oxford 3000 ให้คุณ...</b>", "HTML");
       try {
         const success = await sendIndividualVocabulary(chatId);
         if (!success) {
-          await sendMessage(chatId, "❌ เกิดข้อผิดพลาดในการดึงคำศัพท์ กรุณาลองใหม่อีกครั้ง");
+          await sendMessage(chatId, "❌ เกิดข้อผิดพลาดในการดึงคำศัพท์ กรุณาลองใหม่อีกครั้ง", "HTML");
         }
       } catch (err) {
         console.error("Instant vocabulary failed:", err);
-        await sendMessage(chatId, "❌ เกิดข้อผิดพลาดในการดึงคำศัพท์ กรุณาลองใหม่อีกครั้ง");
+        await sendMessage(chatId, "❌ เกิดข้อผิดพลาดในการดึงคำศัพท์ กรุณาลองใหม่อีกครั้ง", "HTML");
       }
       return Response.json({ ok: true });
     }
