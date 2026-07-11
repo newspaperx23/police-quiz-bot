@@ -30,8 +30,8 @@ export async function POST(request: Request) {
     if (subjectFilter) {
       query = query.where("subject", "==", subjectFilter);
     }
-    // Fetch a larger batch and filter in memory
-    const rawSnapshot = await query.limit(limit * 5).get();
+    // Fetch a larger batch (up to 1000) and filter in memory
+    const rawSnapshot = await query.limit(1000).get();
     
     // Filter to only unverified quizzes
     const unverifiedDocs = rawSnapshot.docs.filter(

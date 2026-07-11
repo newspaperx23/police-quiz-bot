@@ -153,8 +153,8 @@ export default function DashboardPage() {
               hasMore = false;
             }
 
-            // Safety: cap at 30 batches per subject (150 quizzes)
-            if (batchNum >= 30) {
+            // Safety: cap at 200 batches per subject (1000 quizzes)
+            if (batchNum >= 200) {
               hasMore = false;
             }
           } catch (fetchErr) {
