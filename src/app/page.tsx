@@ -52,6 +52,54 @@ export default function DashboardPage() {
     }
   };
 
+  const [bulkGenerating, setBulkGenerating] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState(0);
+  const [bulkStatusText, setBulkStatusText] = useState<string | null>(null);
+
+  const generateBulkQuizzes = async () => {
+    if (!confirm("คุณต้องการสั่งให้ AI ออกข้อสอบเพิ่มทุกวิชา วิชาละ 50 ข้อใช่หรือไม่?\n(ระบบจะแบ่งทำทีละ 10 ข้อทั้งหมด 30 รอบเพื่อป้องกันปัญหาเซิร์ฟเวอร์หลุด และจะป้องกันไม่ให้ซ้ำกับข้อสอบเดิมในระบบด้วย โดยจะใช้เวลาประมาณ 2-3 นาที)")) {
+      return;
+    }
+
+    const subjects = ["ความสามารถทั่วไป", "ภาษาไทย", "ภาษาอังกฤษ", "คอมพิวเตอร์", "กฎหมาย", "สังคม"];
+    const totalSteps = subjects.length * 5; // 6 subjects * 5 batches = 30 steps
+    let currentStep = 0;
+
+    setBulkGenerating(true);
+    setBulkStatusText("เริ่มต้นระบบการออกข้อสอบจำนวนมาก...");
+    setBulkProgress(0);
+
+    try {
+      for (const subject of subjects) {
+        for (let batch = 1; batch <= 5; batch++) {
+          setBulkStatusText(`กำลังออกข้อสอบวิชา "${subject}" (รอบที่ ${batch}/5)...`);
+          
+          const res = await fetch(`/api/generate-pool?subject=${encodeURIComponent(subject)}&count=10`);
+          const data = await res.json();
+          if (!res.ok) {
+            throw new Error(data.error || `ล้มเหลวในการออกข้อสอบวิชา ${subject} รอบที่ ${batch}`);
+          }
+
+          currentStep++;
+          const percent = Math.round((currentStep / totalSteps) * 100);
+          setBulkProgress(percent);
+        }
+      }
+
+      setBulkStatusText("🎉 เจนข้อสอบใหม่ทุกวิชาสำเร็จ! วิชาละ +50 ข้อ (รวมทั้งหมด +300 ข้อ) และจัดเก็บในคลังโดยไม่มีการออกซ้ำเรียบร้อยแล้วครับ");
+      // Refresh stats
+      const statsRes = await fetch(`/api/stats?t=${Date.now()}`);
+      if (statsRes.ok) {
+        const statsData = await statsRes.json();
+        setStats(statsData);
+      }
+    } catch (err) {
+      setBulkStatusText(`❌ เกิดข้อผิดพลาดกลางคัน: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally {
+      setBulkGenerating(false);
+    }
+  };
+
   const fetchStats = useCallback(async () => {
     try {
       setLoading(true);
@@ -309,48 +357,94 @@ export default function DashboardPage() {
               </div>
 
               {/* Action row to generate pool quizzes */}
-              <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap", background: "rgba(255, 255, 255, 0.01)", padding: "15px", borderRadius: "8px", border: "1px solid rgba(255, 255, 255, 0.04)" }}>
-                <span style={{ fontSize: "14px", fontWeight: "500", color: "rgba(255, 255, 255, 0.8)" }}>⚡ สั่ง AI ออกข้อสอบเพิ่มลงคลัง:</span>
-                <select
-                  value={selectedPoolSubject}
-                  onChange={(e) => setSelectedPoolSubject(e.target.value)}
-                  disabled={generating}
-                  style={{
-                    background: "rgba(255, 255, 255, 0.05)",
-                    color: "#ffffff",
-                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                    padding: "8px 12px",
-                    borderRadius: "6px",
-                    cursor: "pointer",
-                    outline: "none"
-                  }}
-                >
-                  <option value="ความสามารถทั่วไป" style={{ background: "#111", color: "#fff" }}>ความสามารถทั่วไป</option>
-                  <option value="ภาษาไทย" style={{ background: "#111", color: "#fff" }}>ภาษาไทย</option>
-                  <option value="ภาษาอังกฤษ" style={{ background: "#111", color: "#fff" }}>ภาษาอังกฤษ</option>
-                  <option value="คอมพิวเตอร์" style={{ background: "#111", color: "#fff" }}>คอมพิวเตอร์</option>
-                  <option value="กฎหมาย" style={{ background: "#111", color: "#fff" }}>กฎหมาย</option>
-                  <option value="สังคม" style={{ background: "#111", color: "#fff" }}>สังคม</option>
-                </select>
-                <button
-                  onClick={generatePoolQuizzes}
-                  disabled={generating}
-                  style={{
-                    background: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
-                    color: "#ffffff",
-                    border: "none",
-                    padding: "8px 16px",
-                    borderRadius: "6px",
-                    fontWeight: "600",
-                    cursor: "pointer",
-                    transition: "all 0.2s ease",
-                    opacity: generating ? 0.7 : 1
-                  }}
-                >
-                  {generating ? "กำลังออกข้อสอบ..." : "สั่ง AI ออกข้อสอบเพิ่ม (+5 ข้อ)"}
-                </button>
-                {generationMsg && (
-                  <span style={{ fontSize: "14px", marginLeft: "10px", color: generationMsg.includes("สำเร็จ") ? "#10b981" : "#ef4444" }}>{generationMsg}</span>
+              <div style={{ display: "flex", flexDirection: "column", gap: "15px", background: "rgba(255, 255, 255, 0.01)", padding: "15px", borderRadius: "8px", border: "1px solid rgba(255, 255, 255, 0.04)" }}>
+                {/* Row 1: Single Subject Generation */}
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: "14px", fontWeight: "500", color: "rgba(255, 255, 255, 0.8)" }}>⚡ สั่ง AI ออกข้อสอบเพิ่มลงคลัง:</span>
+                  <select
+                    value={selectedPoolSubject}
+                    onChange={(e) => setSelectedPoolSubject(e.target.value)}
+                    disabled={generating || bulkGenerating}
+                    style={{
+                      background: "rgba(255, 255, 255, 0.05)",
+                      color: "#ffffff",
+                      border: "1px solid rgba(255, 255, 255, 0.1)",
+                      padding: "8px 12px",
+                      borderRadius: "6px",
+                      cursor: "pointer",
+                      outline: "none"
+                    }}
+                  >
+                    <option value="ความสามารถทั่วไป" style={{ background: "#111", color: "#fff" }}>ความสามารถทั่วไป</option>
+                    <option value="ภาษาไทย" style={{ background: "#111", color: "#fff" }}>ภาษาไทย</option>
+                    <option value="ภาษาอังกฤษ" style={{ background: "#111", color: "#fff" }}>ภาษาอังกฤษ</option>
+                    <option value="คอมพิวเตอร์" style={{ background: "#111", color: "#fff" }}>คอมพิวเตอร์</option>
+                    <option value="กฎหมาย" style={{ background: "#111", color: "#fff" }}>กฎหมาย</option>
+                    <option value="สังคม" style={{ background: "#111", color: "#fff" }}>สังคม</option>
+                  </select>
+                  <button
+                    onClick={generatePoolQuizzes}
+                    disabled={generating || bulkGenerating}
+                    style={{
+                      background: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
+                      color: "#ffffff",
+                      border: "none",
+                      padding: "8px 16px",
+                      borderRadius: "6px",
+                      fontWeight: "600",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      opacity: (generating || bulkGenerating) ? 0.7 : 1
+                    }}
+                  >
+                    {generating ? "กำลังออกข้อสอบ..." : "สั่ง AI ออกข้อสอบเฉพาะวิชา (+5 ข้อ)"}
+                  </button>
+                  {generationMsg && (
+                    <span style={{ fontSize: "14px", marginLeft: "10px", color: generationMsg.includes("สำเร็จ") ? "#10b981" : "#ef4444" }}>{generationMsg}</span>
+                  )}
+                </div>
+
+                {/* Row 2: Bulk All Subjects Generation */}
+                <div style={{ borderTop: "1px solid rgba(255, 255, 255, 0.05)", paddingTop: "15px", display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: "14px", fontWeight: "500", color: "rgba(255, 255, 255, 0.8)" }}>🔥 เจนข้อสอบครั้งใหญ่:</span>
+                  <button
+                    onClick={generateBulkQuizzes}
+                    disabled={generating || bulkGenerating}
+                    style={{
+                      background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                      color: "#ffffff",
+                      border: "none",
+                      padding: "8px 16px",
+                      borderRadius: "6px",
+                      fontWeight: "600",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      opacity: (generating || bulkGenerating) ? 0.7 : 1
+                    }}
+                  >
+                    {bulkGenerating ? "กำลังรันระบบ..." : "สั่ง AI ออกข้อสอบเพิ่มทุกวิชา (วิชาละ +50 ข้อ)"}
+                  </button>
+                </div>
+
+                {/* Progress Bar for Bulk Generation */}
+                {bulkStatusText && (
+                  <div style={{ marginTop: "5px", background: "rgba(255, 255, 255, 0.02)", padding: "12px 15px", borderRadius: "8px", border: "1px solid rgba(255, 255, 255, 0.05)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px", fontSize: "13px" }}>
+                      <span style={{ color: "#d4d4d4" }}>{bulkStatusText}</span>
+                      {bulkGenerating && <span style={{ fontWeight: "bold", color: "#10b981" }}>{bulkProgress}%</span>}
+                    </div>
+                    <div style={{ width: "100%", height: "8px", background: "rgba(255, 255, 255, 0.1)", borderRadius: "4px", overflow: "hidden" }}>
+                      <div 
+                        style={{ 
+                          width: `${bulkProgress}%`, 
+                          height: "100%", 
+                          background: "linear-gradient(90deg, #3b82f6, #10b981)", 
+                          borderRadius: "4px",
+                          transition: "width 0.4s ease"
+                        }} 
+                      />
+                    </div>
+                  </div>
                 )}
               </div>
             </div>

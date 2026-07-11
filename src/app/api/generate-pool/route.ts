@@ -26,6 +26,22 @@ export async function GET(request: Request) {
     const syllabus = syllabusMap[subject];
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+    // Fetch existing questions in the pool for this subject to prevent duplicates
+    let pastQuestionsText = "";
+    try {
+      const existingSnapshot = await db
+        .collection("global_quizzes")
+        .where("subject", "==", subject)
+        .limit(40)
+        .get();
+      if (!existingSnapshot.empty) {
+        const pastQuestions = existingSnapshot.docs.map((doc) => doc.data().question);
+        pastQuestionsText = `\nห้ามออกข้อสอบที่มีคำถามหรือเนื้อความซ้ำหรือใกล้เคียงกับข้อสอบเก่าเหล่านี้เด็ดขาด:\n${pastQuestions.map((q, idx) => `${idx + 1}. ${q}`).join("\n")}`;
+      }
+    } catch (err) {
+      console.error("Failed to fetch existing global_quizzes:", err);
+    }
+
     // Generate questions in bulk via OpenAI
     const prompt = `คุณคืออาจารย์ผู้ออกข้อสอบคัดเลือกนายสิบตำรวจไทย (สายอำนวยการ)
 วิชา: ${subject}
@@ -50,7 +66,7 @@ export async function GET(request: Request) {
 
 กฎ:
 - correct_option_id ต้องเป็น index ตัวเลข (0 ถึง 3) เท่านั้น
-- ข้อสอบระดับยากปานกลาง เหมาะสำหรับการสอบคัดเลือกจริง`;
+- ข้อสอบระดับยากปานกลาง เหมาะสำหรับการสอบคัดเลือกจริง${pastQuestionsText}`;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
