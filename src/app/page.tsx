@@ -359,7 +359,7 @@ function Navbar() {
     <nav className="navbar">
       <div className="container navbar__inner">
         <a href="/" className="navbar__brand">
-          <div className="navbar__logo">Q</div>
+          <img src="/logo.png" alt="Logo" className="navbar__logo" />
           <div>
             <div className="navbar__title">Police Quiz Bot</div>
             <div className="navbar__subtitle">Dashboard</div>

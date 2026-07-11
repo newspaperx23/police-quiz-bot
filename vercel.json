@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/send-quiz",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/midnight-notify",
+      "schedule": "0 17 * * *"
+    }
+  ]
+}

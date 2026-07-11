@@ -19,16 +19,6 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    // Log request body to Firestore for debugging
-    try {
-      await db.collection("webhook_logs").add({
-        timestamp: new Date(),
-        body,
-      });
-    } catch (logErr) {
-      console.error("Failed to write webhook log:", logErr);
-    }
-
     // ─── Handle Poll Answer webhook update ─────────────
     const pollAnswer = body?.poll_answer;
     if (pollAnswer) {
@@ -51,10 +41,37 @@ export async function POST(request: NextRequest) {
               const currentCorrect = (uData.quizzesCorrect || 0) + (isCorrect ? 1 : 0);
               const currentIncorrect = (uData.quizzesIncorrect || 0) + (isCorrect ? 0 : 1);
 
+              // ─── Daily Streak tracking ─────────────
+              const now = new Date();
+              const todayStr = now.toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" }); // "YYYY-MM-DD"
+              const lastAnswerDate = uData.lastAnswerDate || null;
+              let currentStreak = uData.currentStreak || 0;
+              let longestStreak = uData.longestStreak || 0;
+
+              if (lastAnswerDate !== todayStr) {
+                // Check if yesterday
+                const yesterday = new Date(now);
+                yesterday.setDate(yesterday.getDate() - 1);
+                const yesterdayStr = yesterday.toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
+
+                if (lastAnswerDate === yesterdayStr) {
+                  currentStreak += 1; // consecutive day
+                } else if (lastAnswerDate === null || lastAnswerDate < yesterdayStr) {
+                  currentStreak = 1; // streak broken, restart
+                }
+                // else: lastAnswerDate is today already (no change, but we handle above)
+
+                longestStreak = Math.max(longestStreak, currentStreak);
+              }
+              // If lastAnswerDate === todayStr, don't change streak (already counted today)
+
               transaction.update(userRef, {
                 quizzesAnswered: currentAnswered,
                 quizzesCorrect: currentCorrect,
                 quizzesIncorrect: currentIncorrect,
+                lastAnswerDate: todayStr,
+                currentStreak,
+                longestStreak,
               });
             }
           });
@@ -69,9 +86,9 @@ export async function POST(request: NextRequest) {
 
           // Send feedback message to the user
           if (isCorrect) {
-            await sendMessage(chatId, "🎉 *ถูกต้องนะครับ\\!* เก่งมากครับ 👏");
+            await sendMessage(chatId, "🎉 <b>ถูกต้องนะครับ!</b> เก่งมากครับ 👏", "HTML");
           } else {
-            await sendMessage(chatId, "❌ *ยังไม่ถูกนะครับ\\!* ลองทบทวนคำใบ้และเฉลยดูใหม่น้า ✌️");
+            await sendMessage(chatId, "❌ <b>ยังไม่ถูกนะครับ!</b> ลองทบทวนคำใบ้และเฉลยดูใหม่น้า ✌️", "HTML");
           }
         }
       }
@@ -98,6 +115,11 @@ export async function POST(request: NextRequest) {
           createdAt: FieldValue.serverTimestamp(),
           quizzesSent: 0,
           quizzesAnswered: 0,
+          quizzesCorrect: 0,
+          quizzesIncorrect: 0,
+          currentStreak: 0,
+          longestStreak: 0,
+          lastAnswerDate: null,
         });
       } else {
         await userRef.update({ isAwake: true });
@@ -266,6 +288,14 @@ export async function POST(request: NextRequest) {
       
       const rate = answered > 0 ? ((correct / answered) * 100).toFixed(1) : "0.0";
 
+      const streak = uData.currentStreak || 0;
+      const longestStreak = uData.longestStreak || 0;
+
+      // Exam countdown (29 พ.ย. 69 คือ Nov 29, 2026)
+      const examDate = new Date("2026-11-29T00:00:00+07:00");
+      const nowDate = new Date();
+      const daysLeft = Math.max(0, Math.ceil((examDate.getTime() - nowDate.getTime()) / (1000 * 60 * 60 * 24)));
+
       const statsMessage =
         `📊 <b>สถิติการเรียนรู้ของคุณ:</b>\n\n` +
         `📚 <b>วิชาปัจจุบัน:</b> ${currentSubject}\n` +
@@ -274,6 +304,8 @@ export async function POST(request: NextRequest) {
         `✅ <b>ทำแล้วตอบถูก:</b> ${correct} ข้อ\n` +
         `❌ <b>ทำแล้วตอบผิด:</b> ${incorrect} ข้อ\n` +
         `📈 <b>อัตราตอบถูก:</b> ${rate}%\n\n` +
+        `🔥 <b>Streak:</b> ${streak} วันติดต่อกัน (สูงสุด ${longestStreak} วัน)\n` +
+        `📅 <b>นับถอยหลังสอบ:</b> เหลืออีก ${daysLeft} วัน (สอบ 29 พ.ย. 69)\n\n` +
         `สู้ๆ นะครับ! ฝึกทำวันละนิดเพื่อเป้าหมายของคุณ 👮‍♂️✨`;
 
       await sendMessage(chatId, statsMessage, "HTML");

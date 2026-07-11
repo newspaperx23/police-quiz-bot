@@ -1,0 +1,20 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "quiz_history",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "chatId", "order": "ASCENDING" },
+        { "fieldPath": "sentAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "active_polls",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "answered", "order": "ASCENDING" },
+        { "fieldPath": "sentAt", "order": "ASCENDING" }
+      ]
+    }
+  ]
+}

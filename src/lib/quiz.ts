@@ -1,4 +1,5 @@
 import { db } from "./firebase";
+import { FieldValue } from "firebase-admin/firestore";
 import { syllabusMap, getRandomSubject } from "./syllabus";
 import { escapeMarkdownV2, sendMessage, sendQuizPoll } from "./telegram";
 import OpenAI from "openai";
@@ -133,7 +134,7 @@ export async function sendIndividualQuiz(
     // ─── Update stats ─────────────────────────────
     const userRef = db.collection("users").doc(chatId);
     await userRef.update({
-      quizzesSent: quizzesSentBefore + 1,
+      quizzesSent: FieldValue.increment(1),
       lastQuizAt: new Date(),
       lastSubject: subject,
     });

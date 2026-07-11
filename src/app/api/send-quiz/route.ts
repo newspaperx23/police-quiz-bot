@@ -13,11 +13,12 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(request: NextRequest) {
   try {
-    // ─── Auth check ────────────────────────────────────
+    // ─── Auth check (supports both Vercel Cron and GitHub Actions) ──
     const authHeader = request.headers.get("authorization");
     const expectedToken = `Bearer ${process.env.CRON_SECRET}`;
+    const isVercelCron = request.headers.get("x-vercel-cron") === "true";
 
-    if (!authHeader || authHeader !== expectedToken) {
+    if (!isVercelCron && (!authHeader || authHeader !== expectedToken)) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -68,6 +69,28 @@ export async function POST(request: NextRequest) {
         console.error(`Error processing user ${chatId}:`, userError);
         errorCount++;
       }
+
+      // Rate limit: 200ms delay between users to prevent Telegram API throttle
+      await new Promise((r) => setTimeout(r, 200));
+    }
+
+    // ─── Cleanup old active_polls (older than 7 days) ────
+    try {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const oldPolls = await db
+        .collection("active_polls")
+        .where("sentAt", "<", sevenDaysAgo)
+        .limit(50)
+        .get();
+      if (!oldPolls.empty) {
+        const batch = db.batch();
+        oldPolls.docs.forEach((doc) => batch.delete(doc.ref));
+        await batch.commit();
+        console.log(`Cleaned up ${oldPolls.size} old active_polls`);
+      }
+    } catch (cleanupErr) {
+      console.error("active_polls cleanup error:", cleanupErr);
     }
 
     return Response.json({
