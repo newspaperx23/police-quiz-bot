@@ -7,6 +7,9 @@ interface StatsData {
   awakeUsers: number;
   sleepingUsers: number;
   totalQuizzesSent: number;
+  totalQuizzesAnswered?: number;
+  totalQuizzesCorrect?: number;
+  totalQuizzesIncorrect?: number;
   subjectCounts: Record<string, number>;
   recentQuizzes: {
     id: string;
@@ -108,6 +111,11 @@ export default function DashboardPage() {
   );
   const maxSubject = Math.max(...subjectEntries.map((e) => e[1]), 1);
 
+  const answered = stats.totalQuizzesAnswered || 0;
+  const correct = stats.totalQuizzesCorrect || 0;
+  const incorrect = stats.totalQuizzesIncorrect || 0;
+  const correctRate = answered > 0 ? Math.round((correct / answered) * 100) : 0;
+
   return (
     <>
       <Navbar />
@@ -159,6 +167,22 @@ export default function DashboardPage() {
             <div className="stat-card__label">ข้อสอบที่ส่งแล้ว</div>
             <div className="stat-card__value stat-card__value--purple">
               {stats.totalQuizzesSent}
+            </div>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-card__icon" style={{ background: "rgba(34, 197, 94, 0.1)", color: "#22c55e", border: "1px solid rgba(34, 197, 94, 0.2)" }}>🎯</div>
+            <div className="stat-card__label">ทำแล้ว (ถูก / ผิด)</div>
+            <div className="stat-card__value" style={{ color: "#ffffff", fontSize: "28px" }}>
+              {answered} <span style={{ fontSize: "16px", color: "var(--text-muted)", fontWeight: "normal" }}>({correct} / {incorrect})</span>
+            </div>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-card__icon" style={{ background: "rgba(245, 158, 11, 0.1)", color: "#f59e0b", border: "1px solid rgba(245, 158, 11, 0.2)" }}>📈</div>
+            <div className="stat-card__label">อัตราทำถูกเฉลี่ย</div>
+            <div className="stat-card__value" style={{ color: "var(--warning)" }}>
+              {correctRate}%
             </div>
           </div>
         </section>

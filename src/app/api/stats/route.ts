@@ -39,6 +39,21 @@ export async function GET() {
       0
     );
 
+    const totalQuizzesAnswered = users.reduce(
+      (sum, u) => sum + ((u as Record<string, unknown>).quizzesAnswered as number || 0),
+      0
+    );
+
+    const totalQuizzesCorrect = users.reduce(
+      (sum, u) => sum + ((u as Record<string, unknown>).quizzesCorrect as number || 0),
+      0
+    );
+
+    const totalQuizzesIncorrect = users.reduce(
+      (sum, u) => sum + ((u as Record<string, unknown>).quizzesIncorrect as number || 0),
+      0
+    );
+
     // ─── Recent quiz history (last 20) ────────────────
     const historySnapshot = await db
       .collection("quiz_history")
@@ -92,6 +107,9 @@ export async function GET() {
       awakeUsers,
       sleepingUsers,
       totalQuizzesSent,
+      totalQuizzesAnswered,
+      totalQuizzesCorrect,
+      totalQuizzesIncorrect,
       subjectCounts,
       recentQuizzes,
       dailyCounts,

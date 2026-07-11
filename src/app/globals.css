@@ -304,7 +304,7 @@ body {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
   margin-bottom: 40px;
   animation: fade-in-up 0.6s ease-out 0.3s both;
@@ -794,7 +794,7 @@ body {
 
 @media (max-width: 768px) {
   .stats-grid {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
     gap: 12px;
   }
   .dashboard-grid {
