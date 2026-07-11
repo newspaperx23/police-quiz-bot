@@ -7,7 +7,8 @@ export const dynamic = "force-dynamic";
 /**
  * GET/POST /api/send-vocabulary
  * Scheduled vocabulary dispatcher. Secured by CRON_SECRET bearer token.
- * Iterates through active users and sends a vocabulary word if they are due (every 1 hour).
+ * Sends vocabulary to ALL users every 1 hour — regardless of sleep mode.
+ * (Quiz delivery respects sleep mode, but vocabulary is always sent 24/7)
  */
 export async function GET(request: NextRequest) {
   return handleDispatch(request);
@@ -28,18 +29,18 @@ async function handleDispatch(request: NextRequest) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // ─── Fetch awake users ────────────────────────────
+    // ─── Fetch ALL users (send vocabulary 24/7 regardless of sleep mode) ──
     const snapshot = await db
       .collection("users")
-      .where("isAwake", "==", true)
       .get();
 
     if (snapshot.empty) {
-      return Response.json({ message: "No awake users", sent: 0 });
+      return Response.json({ message: "No users", sent: 0 });
     }
 
     let sentCount = 0;
     let errorCount = 0;
+    let skippedCount = 0;
     const now = Date.now();
     const intervalMs = 60 * 60 * 1000; // 1 hour in milliseconds
 
@@ -55,6 +56,7 @@ async function handleDispatch(request: NextRequest) {
       const isTime = lastVocabAt === 0 || msPassed >= (intervalMs - 15000);
 
       if (!isTime) {
+        skippedCount++;
         continue;
       }
 
@@ -75,9 +77,10 @@ async function handleDispatch(request: NextRequest) {
     }
 
     return Response.json({
-      message: "Vocabulary dispatch complete",
+      message: "Vocabulary dispatch complete (24/7 mode)",
       sent: sentCount,
       errors: errorCount,
+      skipped: skippedCount,
       total: snapshot.size,
     });
   } catch (error) {

@@ -101,6 +101,58 @@ export default function DashboardPage() {
     }
   };
 
+  const [recheckRunning, setRecheckRunning] = useState(false);
+  const [recheckProgress, setRecheckProgress] = useState(0);
+  const [recheckStatusText, setRecheckStatusText] = useState<string | null>(null);
+
+  const startRecheckPool = async () => {
+    const subjects = ["ความสามารถทั่วไป", "ภาษาไทย", "ภาษาอังกฤษ", "คอมพิวเตอร์", "กฎหมาย", "สังคม"];
+    setRecheckRunning(true);
+    setRecheckProgress(0);
+    setRecheckStatusText("เริ่มตรวจสอบคลังข้อสอบ...");
+
+    let totalFixed = 0;
+    let totalDeleted = 0;
+    let totalConfirmed = 0;
+    let totalChecked = 0;
+
+    try {
+      for (let i = 0; i < subjects.length; i++) {
+        const subject = subjects[i];
+        setRecheckStatusText(`กำลังตรวจสอบวิชา "${subject}"...`);
+
+        const res = await fetch(`/api/recheck-pool?subject=${encodeURIComponent(subject)}&limit=100`, {
+          method: "POST",
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          totalFixed += data.fixed || 0;
+          totalDeleted += data.deleted || 0;
+          totalConfirmed += data.confirmed || 0;
+          totalChecked += data.checked || 0;
+        }
+
+        setRecheckProgress(Math.round(((i + 1) / subjects.length) * 100));
+      }
+
+      setRecheckStatusText(
+        `✅ ตรวจสอบเสร็จสิ้น! ตรวจแล้ว ${totalChecked} ข้อ — ` +
+        `ถูกต้อง: ${totalConfirmed}, แก้ไข: ${totalFixed}, ลบ: ${totalDeleted}`
+      );
+
+      // Refresh stats
+      const statsRes = await fetch(`/api/stats?t=${Date.now()}`);
+      if (statsRes.ok) {
+        const statsData = await statsRes.json();
+        setStats(statsData);
+      }
+    } catch (err) {
+      setRecheckStatusText(`❌ เกิดข้อผิดพลาด: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally {
+      setRecheckRunning(false);
+    }
+  };
+
   const fetchStats = useCallback(async () => {
     try {
       setLoading(true);
@@ -440,6 +492,49 @@ export default function DashboardPage() {
                           width: `${bulkProgress}%`, 
                           height: "100%", 
                           background: "linear-gradient(90deg, #3b82f6, #10b981)", 
+                          borderRadius: "4px",
+                          transition: "width 0.4s ease"
+                        }} 
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Row 3: Recheck Pool */}
+                <div style={{ borderTop: "1px solid rgba(255, 255, 255, 0.05)", paddingTop: "15px", display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: "14px", fontWeight: "500", color: "rgba(255, 255, 255, 0.8)" }}>🔍 ตรวจสอบเฉลย:</span>
+                  <button
+                    onClick={startRecheckPool}
+                    disabled={recheckRunning || generating || bulkGenerating}
+                    style={{
+                      background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+                      color: "#ffffff",
+                      border: "none",
+                      padding: "8px 16px",
+                      borderRadius: "6px",
+                      fontWeight: "600",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      opacity: (recheckRunning || generating || bulkGenerating) ? 0.7 : 1
+                    }}
+                  >
+                    {recheckRunning ? "กำลังตรวจสอบ..." : "Recheck เฉลยทั้งคลัง (AI ตรวจทุกข้อ)"}
+                  </button>
+                </div>
+
+                {/* Progress Bar for Recheck */}
+                {recheckStatusText && (
+                  <div style={{ marginTop: "5px", background: "rgba(255, 255, 255, 0.02)", padding: "12px 15px", borderRadius: "8px", border: "1px solid rgba(245, 158, 11, 0.15)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px", fontSize: "13px" }}>
+                      <span style={{ color: "#d4d4d4" }}>{recheckStatusText}</span>
+                      {recheckRunning && <span style={{ fontWeight: "bold", color: "#f59e0b" }}>{recheckProgress}%</span>}
+                    </div>
+                    <div style={{ width: "100%", height: "8px", background: "rgba(255, 255, 255, 0.1)", borderRadius: "4px", overflow: "hidden" }}>
+                      <div 
+                        style={{ 
+                          width: `${recheckProgress}%`, 
+                          height: "100%", 
+                          background: "linear-gradient(90deg, #f59e0b, #ef4444)", 
                           borderRadius: "4px",
                           transition: "width 0.4s ease"
                         }} 

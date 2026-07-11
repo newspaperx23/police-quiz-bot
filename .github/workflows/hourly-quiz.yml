@@ -1,8 +1,8 @@
-name: Periodic Quiz Dispatcher
+name: Periodic Quiz & Vocabulary Dispatcher
 
 on:
   schedule:
-    # Run every 10 minutes
+    # Run every 10 minutes for quiz dispatch
     - cron: '*/10 * * * *'
   workflow_dispatch: # Allow manual trigger
 
@@ -17,3 +17,11 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             -H "Content-Type: application/json" \
             "${{ secrets.VERCEL_API_URL }}/api/send-quiz"
+
+      - name: Trigger Vocabulary Dispatch (every run = every 10 min, API handles 1h interval)
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            "${{ secrets.VERCEL_API_URL }}/api/send-vocabulary"
