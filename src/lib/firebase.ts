@@ -17,10 +17,14 @@ export const db = new Proxy({} as ReturnType<typeof getFirestore>, {
           );
         }
 
+        const formattedKey = privateKey
+          .replace(/^"(.*)"$/, "$1") // Strip surrounding double quotes if present
+          .replace(/\\n/g, "\n");   // Replace escaped newlines with real newlines
+
         const serviceAccount: ServiceAccount = {
           projectId,
           clientEmail,
-          privateKey: privateKey.replace(/\\n/g, "\n"),
+          privateKey: formattedKey,
         };
         initializeApp({ credential: cert(serviceAccount) });
       }
