@@ -31,7 +31,7 @@ export default function DashboardPage() {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch("/api/stats");
+      const res = await fetch(`/api/stats?t=${Date.now()}`);
       if (!res.ok) throw new Error("Failed to fetch stats");
       const data = await res.json();
       setStats(data);

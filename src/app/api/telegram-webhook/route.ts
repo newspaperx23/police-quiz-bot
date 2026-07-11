@@ -56,6 +56,13 @@ export async function POST(request: NextRequest) {
             isCorrect,
             answeredAt: new Date(),
           });
+
+          // Send feedback message to the user
+          if (isCorrect) {
+            await sendMessage(chatId, "🎉 *ถูกต้องนะครับ\\!* เก่งมากครับ 👏");
+          } else {
+            await sendMessage(chatId, "❌ *ยังไม่ถูกนะครับ\\!* ลองทบทวนคำใบ้และเฉลยดูใหม่น้า ✌️");
+          }
         }
       }
       return Response.json({ ok: true });
@@ -216,7 +223,7 @@ export async function POST(request: NextRequest) {
       await userRef.set({ quizInterval: minutes }, { merge: true });
       await sendMessage(
         chatId,
-        `⏱️ *ตั้งค่าสำเร็จ\\!* ระบบจะส่งข้อสอบให้คุณทุกๆ *${minutes}* นาที \\(เมื่อตื่นอยู่\\)`
+        `⏱️ *เปลี่ยนเวลาส่งข้อสอบเป็นทุกๆ ${minutes} นาที เรียบร้อยแล้วครับ\\!* \\(ระบบจะเริ่มรอบใหม่ทันที\\)`
       );
 
       // Send a quiz immediately to start the cycle
@@ -228,6 +235,38 @@ export async function POST(request: NextRequest) {
         console.error("Instant quiz on /settimer failed:", err);
       }
 
+      return Response.json({ ok: true });
+    }
+
+    // ─── /stats ────────────────────────────────────────
+    if (text === "/stats") {
+      const doc = await userRef.get();
+      if (!doc.exists) {
+        await sendMessage(chatId, "❌ *ยังไม่พบข้อมูลผู้ใช้ในระบบ*");
+        return Response.json({ ok: true });
+      }
+
+      const uData = doc.data() || {};
+      const answered = uData.quizzesAnswered || 0;
+      const correct = uData.quizzesCorrect || 0;
+      const incorrect = uData.quizzesIncorrect || 0;
+      const sent = uData.quizzesSent || 0;
+      const currentSubject = uData.currentSubject || "สุ่มทุกวิชา";
+      const interval = uData.quizInterval || 60;
+      
+      const rate = answered > 0 ? ((correct / answered) * 100).toFixed(1) : "0.0";
+
+      const statsMessage =
+        `📊 *สถิติการเรียนรู้ของคุณ:*\n\n` +
+        `📚 *วิชาปัจจุบัน:* ${currentSubject}\n` +
+        `⏱️ *รอบส่งข้อสอบ:* ทุกๆ ${interval} นาที\n\n` +
+        `📝 *ข้อสอบที่ส่งแล้ว:* ${sent} ข้อ\n` +
+        `✅ *ทำแล้วตอบถูก:* ${correct} ข้อ\n` +
+        `❌ *ทำแล้วตอบผิด:* ${incorrect} ข้อ\n` +
+        `📈 *อัตราตอบถูก:* ${rate}%\n\n` +
+        `สู้ๆ นะครับ! ฝึกทำวันละนิดเพื่อเป้าหมายของคุุณ 👮‍♂️✨`;
+
+      await sendMessage(chatId, statsMessage);
       return Response.json({ ok: true });
     }
 

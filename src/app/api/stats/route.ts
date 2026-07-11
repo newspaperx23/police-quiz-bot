@@ -102,24 +102,27 @@ export async function GET() {
       }
     });
 
-    return Response.json({
-      totalUsers,
-      awakeUsers,
-      sleepingUsers,
-      totalQuizzesSent,
-      totalQuizzesAnswered,
-      totalQuizzesCorrect,
-      totalQuizzesIncorrect,
-      subjectCounts,
-      recentQuizzes,
-      dailyCounts,
-      debug: {
-        hasOpenAI: !!process.env.OPENAI_API_KEY,
-        openaiLen: process.env.OPENAI_API_KEY?.length || 0,
-        hasTelegram: !!process.env.TELEGRAM_BOT_TOKEN,
-        telegramLen: process.env.TELEGRAM_BOT_TOKEN?.length || 0,
+    return Response.json(
+      {
+        totalUsers,
+        awakeUsers,
+        sleepingUsers,
+        totalQuizzesSent,
+        totalQuizzesAnswered,
+        totalQuizzesCorrect,
+        totalQuizzesIncorrect,
+        subjectCounts,
+        recentQuizzes,
+        dailyCounts,
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          "Pragma": "no-cache",
+          "Expires": "0",
+        },
       }
-    });
+    );
   } catch (error) {
     console.error("Stats API error:", error);
     return Response.json(
