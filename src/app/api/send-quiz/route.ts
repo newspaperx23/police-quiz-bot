@@ -12,6 +12,14 @@ export const dynamic = "force-dynamic";
  * who are due based on their individual quizInterval (in minutes).
  */
 export async function POST(request: NextRequest) {
+  return handleDispatch(request);
+}
+
+export async function GET(request: NextRequest) {
+  return handleDispatch(request);
+}
+
+async function handleDispatch(request: NextRequest) {
   try {
     // ─── Auth check (supports both Vercel Cron and GitHub Actions) ──
     const authHeader = request.headers.get("authorization");
