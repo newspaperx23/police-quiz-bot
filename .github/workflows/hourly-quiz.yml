@@ -1,9 +1,9 @@
-name: Hourly Quiz Dispatcher
+name: Periodic Quiz Dispatcher
 
 on:
   schedule:
-    # Run every hour at minute 0
-    - cron: '0 * * * *'
+    # Run every 10 minutes
+    - cron: '*/10 * * * *'
   workflow_dispatch: # Allow manual trigger
 
 jobs:
