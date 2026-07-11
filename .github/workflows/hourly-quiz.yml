@@ -1,0 +1,19 @@
+name: Hourly Quiz Dispatcher
+
+on:
+  schedule:
+    # Run every hour at minute 0
+    - cron: '0 * * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  send-quiz:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Quiz Dispatch
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            "${{ secrets.VERCEL_API_URL }}/api/send-quiz"
