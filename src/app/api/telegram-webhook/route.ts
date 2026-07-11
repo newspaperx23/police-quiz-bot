@@ -59,6 +59,26 @@ export async function POST(request: NextRequest) {
       return Response.json({ ok: true });
     }
 
+    // ─── /help ─────────────────────────────────────────
+    if (text === "/help") {
+      const subjectList = Object.keys(syllabusMap)
+        .map((s) => `• ${s}`)
+        .join("\n");
+
+      const helpMessage =
+        `ℹ️ *คู่มือการใช้งานบอท:*\n\n` +
+        `📚 *รายชื่อวิชาเตรียมสอบนายสิบตำรวจ (อำนวยการ):*\n${subjectList}\n\n` +
+        `🔧 *คำสั่งทั้งหมด:*\n` +
+        `/start \\- ลงทะเบียนและเปิดรับข้อสอบทุกชั่วโมง\n` +
+        `/help \\- แสดงคู่มือแนะนำการใช้งานนี้\n` +
+        `/subject \\[ชื่อวิชา\\] \\- เปลี่ยนวิชาที่ต้องการสอบเฉพาะเจาะจง\n` +
+        `/sleep \\- หยุดส่งข้อสอบชั่วคราว (โหมดพักผ่อน)\n` +
+        `/wake \\- เริ่มส่งข้อสอบต่อ (ออกจากโหมดพัก)`;
+
+      await sendMessage(chatId, helpMessage);
+      return Response.json({ ok: true });
+    }
+
     // ─── /sleep ────────────────────────────────────────
     if (text === "/sleep") {
       await userRef.set({ isAwake: false }, { merge: true });
