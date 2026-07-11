@@ -6,7 +6,6 @@ import OpenAI from "openai";
 
 export const dynamic = "force-dynamic";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 interface QuizQuestion {
   question: string;
@@ -28,6 +27,8 @@ interface QuizQuestion {
  */
 export async function POST(request: NextRequest) {
   try {
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
     // ─── Auth check ────────────────────────────────────
     const authHeader = request.headers.get("authorization");
     const expectedToken = `Bearer ${process.env.CRON_SECRET}`;
