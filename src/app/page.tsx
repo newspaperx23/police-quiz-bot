@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-
 interface StatsData {
   totalUsers: number;
   awakeUsers: number;
@@ -20,12 +19,38 @@ interface StatsData {
     sentAt: string | null;
   }[];
   dailyCounts: Record<string, number>;
+  totalQuizzesInPool?: number;
+  subjectPoolCounts?: Record<string, number>;
 }
-
 export default function DashboardPage() {
   const [stats, setStats] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [generating, setGenerating] = useState(false);
+  const [selectedPoolSubject, setSelectedPoolSubject] = useState("ความสามารถทั่วไป");
+  const [generationMsg, setGenerationMsg] = useState<string | null>(null);
+
+  const generatePoolQuizzes = async () => {
+    try {
+      setGenerating(true);
+      setGenerationMsg(null);
+      const res = await fetch(`/api/generate-pool?subject=${encodeURIComponent(selectedPoolSubject)}&count=5`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to generate");
+      setGenerationMsg(`✅ เจนข้อสอบวิชา ${data.subject} สำเร็จ +${data.savedCount} ข้อ!`);
+      // Refresh stats
+      const statsRes = await fetch(`/api/stats?t=${Date.now()}`);
+      if (statsRes.ok) {
+        const statsData = await statsRes.json();
+        setStats(statsData);
+      }
+    } catch (err) {
+      setGenerationMsg(`❌ เกิดข้อผิดพลาด: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   const fetchStats = useCallback(async () => {
     try {
@@ -253,6 +278,81 @@ export default function DashboardPage() {
                   <p className="empty-state__text">ยังไม่มีข้อมูล</p>
                 </div>
               )}
+            </div>
+          </div>
+        </section>
+
+        {/* ─── Quiz Pool Section ──────────────── */}
+        <section className="recent-section" id="quiz-pool" style={{ marginBottom: "2rem" }}>
+          <div className="card">
+            <div className="card__header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+              <div>
+                <h2 className="card__title" style={{ fontSize: "1.25rem", fontWeight: "600", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span>📦</span> คลังข้อสอบส่วนกลาง (Global Quiz Pool)
+                </h2>
+                <p className="card__subtitle" style={{ fontSize: "13px", color: "rgba(255, 255, 255, 0.5)", marginTop: "4px" }}>
+                  มีข้อสอบในคลังทั้งหมด <strong style={{ color: "#3b82f6" }}>{stats.totalQuizzesInPool || 0}</strong> ข้อ (ดึงส่งสอบรายชั่วโมงแบบไม่ซ้ำคนทำ)
+                </p>
+              </div>
+            </div>
+            <div className="card__body">
+              {/* Subject counts in pool */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "15px", marginBottom: "20px" }}>
+                {Object.entries(stats.subjectPoolCounts || {}).map(([sub, count]) => (
+                  <div key={sub} style={{ background: "rgba(255, 255, 255, 0.02)", padding: "12px 15px", borderRadius: "8px", border: "1px solid rgba(255, 255, 255, 0.05)" }}>
+                    <div style={{ fontSize: "12px", color: "rgba(255, 255, 255, 0.4)", marginBottom: "4px" }}>{sub}</div>
+                    <div style={{ fontSize: "20px", fontWeight: "bold", color: "#ffffff" }}>
+                      {count} <span style={{ fontSize: "12px", fontWeight: "normal", color: "rgba(255, 255, 255, 0.4)" }}>ข้อ</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Action row to generate pool quizzes */}
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap", background: "rgba(255, 255, 255, 0.01)", padding: "15px", borderRadius: "8px", border: "1px solid rgba(255, 255, 255, 0.04)" }}>
+                <span style={{ fontSize: "14px", fontWeight: "500", color: "rgba(255, 255, 255, 0.8)" }}>⚡ สั่ง AI ออกข้อสอบเพิ่มลงคลัง:</span>
+                <select
+                  value={selectedPoolSubject}
+                  onChange={(e) => setSelectedPoolSubject(e.target.value)}
+                  disabled={generating}
+                  style={{
+                    background: "rgba(255, 255, 255, 0.05)",
+                    color: "#ffffff",
+                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    padding: "8px 12px",
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                    outline: "none"
+                  }}
+                >
+                  <option value="ความสามารถทั่วไป" style={{ background: "#111", color: "#fff" }}>ความสามารถทั่วไป</option>
+                  <option value="ภาษาไทย" style={{ background: "#111", color: "#fff" }}>ภาษาไทย</option>
+                  <option value="ภาษาอังกฤษ" style={{ background: "#111", color: "#fff" }}>ภาษาอังกฤษ</option>
+                  <option value="คอมพิวเตอร์" style={{ background: "#111", color: "#fff" }}>คอมพิวเตอร์</option>
+                  <option value="กฎหมาย" style={{ background: "#111", color: "#fff" }}>กฎหมาย</option>
+                  <option value="สังคม" style={{ background: "#111", color: "#fff" }}>สังคม</option>
+                </select>
+                <button
+                  onClick={generatePoolQuizzes}
+                  disabled={generating}
+                  style={{
+                    background: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
+                    color: "#ffffff",
+                    border: "none",
+                    padding: "8px 16px",
+                    borderRadius: "6px",
+                    fontWeight: "600",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                    opacity: generating ? 0.7 : 1
+                  }}
+                >
+                  {generating ? "กำลังออกข้อสอบ..." : "สั่ง AI ออกข้อสอบเพิ่ม (+5 ข้อ)"}
+                </button>
+                {generationMsg && (
+                  <span style={{ fontSize: "14px", marginLeft: "10px", color: generationMsg.includes("สำเร็จ") ? "#10b981" : "#ef4444" }}>{generationMsg}</span>
+                )}
+              </div>
             </div>
           </div>
         </section>

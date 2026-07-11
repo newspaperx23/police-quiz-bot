@@ -102,6 +102,20 @@ export async function GET() {
       }
     });
 
+    // ─── Quiz Pool Stats ──────────────────────────────
+    const poolCountSnapshot = await db.collection("global_quizzes").count().get();
+    const totalQuizzesInPool = poolCountSnapshot.data().count;
+
+    const subjectPoolCounts: Record<string, number> = {};
+    for (const key of SUBJECT_KEYS) {
+      const countSub = await db
+        .collection("global_quizzes")
+        .where("subject", "==", key)
+        .count()
+        .get();
+      subjectPoolCounts[key] = countSub.data().count;
+    }
+
     return Response.json(
       {
         totalUsers,
@@ -114,6 +128,8 @@ export async function GET() {
         subjectCounts,
         recentQuizzes,
         dailyCounts,
+        totalQuizzesInPool,
+        subjectPoolCounts,
       },
       {
         headers: {
