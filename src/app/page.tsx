@@ -62,8 +62,8 @@ export default function DashboardPage() {
   };
 
   const startBulkGeneration = async () => {
-    const subjects = ["ความสามารถทั่วไป", "ภาษาไทย", "ภาษาอังกฤษ", "คอมพิวเตอร์", "กฎหมาย", "สังคม"];
-    const totalSteps = subjects.length * 5; // 6 subjects * 5 batches = 30 steps
+    const subjects = ["ความสามารถทั่วไป", "ภาษาไทย", "ภาษาอังกฤษ", "คอมพิวเตอร์", "กฎหมาย", "สังคม", "ระเบียบงานสารบรรณ"];
+    const totalSteps = subjects.length * 5; // 7 subjects * 5 batches = 35 steps
     let currentStep = 0;
 
     setBulkGenerating(true);
@@ -87,7 +87,7 @@ export default function DashboardPage() {
         }
       }
 
-      setBulkStatusText("🎉 เจนข้อสอบใหม่ทุกวิชาสำเร็จ! วิชาละ +50 ข้อ (รวมทั้งหมด +300 ข้อ) และจัดเก็บในคลังโดยไม่มีการออกซ้ำเรียบร้อยแล้วครับ");
+      setBulkStatusText("🎉 เจนข้อสอบใหม่ทุกวิชาสำเร็จ! วิชาละ +50 ข้อ (รวมทั้งหมด +350 ข้อ) และจัดเก็บในคลังโดยไม่มีการออกซ้ำเรียบร้อยแล้วครับ");
       // Refresh stats
       const statsRes = await fetch(`/api/stats?t=${Date.now()}`);
       if (statsRes.ok) {
@@ -106,7 +106,7 @@ export default function DashboardPage() {
   const [recheckStatusText, setRecheckStatusText] = useState<string | null>(null);
 
   const startRecheckPool = async () => {
-    const subjects = ["ความสามารถทั่วไป", "ภาษาไทย", "ภาษาอังกฤษ", "คอมพิวเตอร์", "กฎหมาย", "สังคม"];
+    const subjects = ["ความสามารถทั่วไป", "ภาษาไทย", "ภาษาอังกฤษ", "คอมพิวเตอร์", "กฎหมาย", "สังคม", "ระเบียบงานสารบรรณ"];
     setRecheckRunning(true);
     setRecheckProgress(0);
     setRecheckStatusText("เริ่มตรวจสอบคลังข้อสอบ...");
@@ -466,6 +466,7 @@ export default function DashboardPage() {
                     <option value="คอมพิวเตอร์" style={{ background: "#111", color: "#fff" }}>คอมพิวเตอร์</option>
                     <option value="กฎหมาย" style={{ background: "#111", color: "#fff" }}>กฎหมาย</option>
                     <option value="สังคม" style={{ background: "#111", color: "#fff" }}>สังคม</option>
+                    <option value="ระเบียบงานสารบรรณ" style={{ background: "#111", color: "#fff" }}>ระเบียบงานสารบรรณ</option>
                   </select>
                   <button
                     onClick={generatePoolQuizzes}
@@ -701,7 +702,7 @@ export default function DashboardPage() {
             <p style={{ fontSize: "13px", color: "rgba(255, 255, 255, 0.6)", lineHeight: "1.6", marginBottom: "24px" }}>
               คุณต้องการสั่งให้ AI ออกข้อสอบเพิ่มทุกวิชา วิชาละ 50 ข้อใช่หรือไม่?<br/>
               <span style={{ color: "#3b82f6", display: "block", marginTop: "8px", fontWeight: "500" }}>
-                * ระบบจะทำงานทั้งหมด 30 รอบ รอบละ 10 ข้อ (รวมเป็น 300 ข้อ) เพื่อความปลอดภัยและคัดกรองโจทย์ซ้ำโดยสมบูรณ์
+                * ระบบจะทำงานทั้งหมด 35 รอบ รอบละ 10 ข้อ (รวมเป็น 350 ข้อ) เพื่อความปลอดภัยและคัดกรองโจทย์ซ้ำโดยสมบูรณ์
               </span>
             </p>
             <div style={{ display: "flex", gap: "10px", justifyContent: "center" }}>
