@@ -124,6 +124,56 @@ export default function DashboardPage() {
     }
   };
 
+  const [sendingVocab, setSendingVocab] = useState(false);
+  const [vocabMsg, setVocabMsg] = useState<string | null>(null);
+
+  const triggerSendVocabulary = async () => {
+    try {
+      setSendingVocab(true);
+      setVocabMsg(null);
+      const savedPassword = localStorage.getItem("admin_password") || password;
+      const res = await fetch("/api/send-vocabulary", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${savedPassword}`,
+          "Content-Type": "application/json",
+        },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      setVocabMsg(`✅ ส่งคำศัพท์สำเร็จ! ส่งให้ ${data.sent ?? 0} คน, ข้าม ${data.skipped ?? 0} คน (ยังไม่ถึงเวลา 1 ชม.)`);
+    } catch (err) {
+      setVocabMsg(`❌ เกิดข้อผิดพลาด: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally {
+      setSendingVocab(false);
+    }
+  };
+
+  const [sendingQuiz, setSendingQuiz] = useState(false);
+  const [quizDispatchMsg, setQuizDispatchMsg] = useState<string | null>(null);
+
+  const triggerSendQuiz = async () => {
+    try {
+      setSendingQuiz(true);
+      setQuizDispatchMsg(null);
+      const savedPassword = localStorage.getItem("admin_password") || password;
+      const res = await fetch("/api/send-quiz", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${savedPassword}`,
+          "Content-Type": "application/json",
+        },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      setQuizDispatchMsg(`✅ Dispatch สำเร็จ! ส่งข้อสอบ ${data.sent ?? 0} คน (รวม ${data.total ?? 0} คนตื่น)`);
+    } catch (err) {
+      setQuizDispatchMsg(`❌ เกิดข้อผิดพลาด: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally {
+      setSendingQuiz(false);
+    }
+  };
+
   const [recheckRunning, setRecheckRunning] = useState(false);
   const [recheckProgress, setRecheckProgress] = useState(0);
   const [recheckStatusText, setRecheckStatusText] = useState<string | null>(null);
@@ -675,12 +725,64 @@ export default function DashboardPage() {
                   </div>
                 )}
 
-                {/* Row 3: Recheck Pool */}
+                {/* Row 3: Manual Quiz Dispatch */}
+                <div style={{ borderTop: "1px solid rgba(255, 255, 255, 0.05)", paddingTop: "15px", display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: "14px", fontWeight: "500", color: "rgba(255, 255, 255, 0.8)" }}>📨 Dispatch ข้อสอบทันที:</span>
+                  <button
+                    id="btn-send-quiz-now"
+                    onClick={triggerSendQuiz}
+                    disabled={sendingQuiz || generating || bulkGenerating || recheckRunning || sendingVocab}
+                    style={{
+                      background: "linear-gradient(135deg, #6366f1 0%, #4338ca 100%)",
+                      color: "#ffffff",
+                      border: "none",
+                      padding: "8px 16px",
+                      borderRadius: "6px",
+                      fontWeight: "600",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      opacity: (sendingQuiz || generating || bulkGenerating || recheckRunning || sendingVocab) ? 0.6 : 1
+                    }}
+                  >
+                    {sendingQuiz ? "⏳ กำลังส่ง..." : "📨 ส่งข้อสอบทันที (Trigger Dispatch)"}
+                  </button>
+                  {quizDispatchMsg && (
+                    <span style={{ fontSize: "13px", color: quizDispatchMsg.includes("✅") ? "#6366f1" : "#ef4444" }}>{quizDispatchMsg}</span>
+                  )}
+                </div>
+
+                {/* Row 4: Manual Vocabulary Send */}
+                <div style={{ borderTop: "1px solid rgba(255, 255, 255, 0.05)", paddingTop: "15px", display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: "14px", fontWeight: "500", color: "rgba(255, 255, 255, 0.8)" }}>📖 ส่งคำศัพท์ทันที:</span>
+                  <button
+                    id="btn-send-vocab-now"
+                    onClick={triggerSendVocabulary}
+                    disabled={sendingVocab || generating || bulkGenerating || recheckRunning || sendingQuiz}
+                    style={{
+                      background: "linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)",
+                      color: "#ffffff",
+                      border: "none",
+                      padding: "8px 16px",
+                      borderRadius: "6px",
+                      fontWeight: "600",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      opacity: (sendingVocab || generating || bulkGenerating || recheckRunning || sendingQuiz) ? 0.6 : 1
+                    }}
+                  >
+                    {sendingVocab ? "⏳ กำลังส่ง..." : "📖 ส่งคำศัพท์ทันที (Oxford 3000)"}
+                  </button>
+                  {vocabMsg && (
+                    <span style={{ fontSize: "13px", color: vocabMsg.includes("✅") ? "#0ea5e9" : "#ef4444" }}>{vocabMsg}</span>
+                  )}
+                </div>
+
+                {/* Row 5: Recheck Pool */}
                 <div style={{ borderTop: "1px solid rgba(255, 255, 255, 0.05)", paddingTop: "15px", display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
                   <span style={{ fontSize: "14px", fontWeight: "500", color: "rgba(255, 255, 255, 0.8)" }}>🔍 ตรวจสอบเฉลย:</span>
                   <button
                     onClick={startRecheckPool}
-                    disabled={recheckRunning || generating || bulkGenerating}
+                    disabled={recheckRunning || generating || bulkGenerating || sendingVocab || sendingQuiz}
                     style={{
                       background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
                       color: "#ffffff",
@@ -690,7 +792,7 @@ export default function DashboardPage() {
                       fontWeight: "600",
                       cursor: "pointer",
                       transition: "all 0.2s ease",
-                      opacity: (recheckRunning || generating || bulkGenerating) ? 0.7 : 1
+                      opacity: (recheckRunning || generating || bulkGenerating || sendingVocab || sendingQuiz) ? 0.7 : 1
                     }}
                   >
                     {recheckRunning ? "กำลังตรวจสอบ..." : "Recheck เฉลยทั้งคลัง (AI ตรวจทุกข้อ)"}

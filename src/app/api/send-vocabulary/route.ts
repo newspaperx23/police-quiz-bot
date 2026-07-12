@@ -20,12 +20,18 @@ export async function POST(request: NextRequest) {
 
 async function handleDispatch(request: NextRequest) {
   try {
-    // ─── Auth check (supports both Vercel Cron and GitHub Actions) ──
+    // ─── Auth check (supports Vercel Cron, GitHub Actions, and Admin Dashboard) ──
     const authHeader = request.headers.get("authorization");
-    const expectedToken = `Bearer ${process.env.CRON_SECRET}`;
+    const expectedCronToken = `Bearer ${process.env.CRON_SECRET}`;
+    const expectedAdminToken = `Bearer ${process.env.ADMIN_PASSWORD}`;
     const isVercelCron = request.headers.get("x-vercel-cron") === "true";
 
-    if (!isVercelCron && (!authHeader || authHeader !== expectedToken)) {
+    const isAuthorized =
+      isVercelCron ||
+      authHeader === expectedCronToken ||
+      (process.env.ADMIN_PASSWORD && authHeader === expectedAdminToken);
+
+    if (!isAuthorized) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 
