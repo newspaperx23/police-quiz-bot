@@ -1,0 +1,24 @@
+name: Daily Midnight Notify (Thai Time)
+
+on:
+  schedule:
+    # Run at UTC 17:00 = Thai midnight 00:00 (every day)
+    - cron: '0 17 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  midnight-notify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger Midnight Notify (Days Left + Streak)
+        run: |
+          HTTP_CODE=$(curl -s -o /tmp/midnight_resp.txt -w "%{http_code}" \
+            --max-time 60 \
+            -X POST \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            "${{ secrets.VERCEL_API_URL }}/api/midnight-notify")
+          echo "Midnight notify HTTP: $HTTP_CODE"
+          cat /tmp/midnight_resp.txt
+          if [ "$HTTP_CODE" != "200" ]; then exit 1; fi

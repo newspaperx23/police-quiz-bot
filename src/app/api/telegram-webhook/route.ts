@@ -24,14 +24,21 @@ export async function POST(request: NextRequest) {
     const pollAnswer = body?.poll_answer;
     if (pollAnswer) {
       const pollId = String(pollAnswer.poll_id).trim();
-      const userChoice = pollAnswer.option_ids[0]; // selected option index
+      const userChoice: number = pollAnswer.option_ids?.[0] ?? -1; // selected option index
+
+      if (userChoice === -1) {
+        // User retracted vote — ignore
+        return Response.json({ ok: true });
+      }
 
       const pollDoc = await db.collection("active_polls").doc(pollId).get();
       if (pollDoc.exists) {
         const pollData = pollDoc.data();
         if (pollData && !pollData.answered) {
-          const { chatId, correctOptionId } = pollData;
-          const isCorrect = userChoice === correctOptionId;
+          const { chatId, correctOptionId, options, explanation } = pollData;
+
+          // correctOptionId เก็บเป็น number ใน Firestore, userChoice เป็น number จาก Telegram
+          const isCorrect = Number(userChoice) === Number(correctOptionId);
 
           const userRef = db.collection("users").doc(chatId);
           await db.runTransaction(async (transaction) => {
@@ -60,11 +67,9 @@ export async function POST(request: NextRequest) {
                 } else if (lastAnswerDate === null || lastAnswerDate < yesterdayStr) {
                   currentStreak = 1; // streak broken, restart
                 }
-                // else: lastAnswerDate is today already (no change, but we handle above)
 
                 longestStreak = Math.max(longestStreak, currentStreak);
               }
-              // If lastAnswerDate === todayStr, don't change streak (already counted today)
 
               transaction.update(userRef, {
                 quizzesAnswered: currentAnswered,
@@ -109,11 +114,21 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          // Send feedback message to the user
+          // ─── ส่ง feedback + เฉลย (เพราะใช้ Regular Poll ไม่ใช่ Quiz Poll) ───
+          const correctText = Array.isArray(options) ? options[correctOptionId] : "";
+          const explanationText = explanation || "";
+
           if (isCorrect) {
-            await sendMessage(chatId, "🎉 <b>ถูกต้องนะครับ!</b> เก่งมากครับ 👏", "HTML");
+            let msg = `🎉 <b>ถูกต้องนะครับ!</b> เก่งมากครับ 👏\n\n`;
+            msg += `✅ <b>คำตอบที่ถูกต้อง:</b> ${correctText}`;
+            if (explanationText) msg += `\n\n📖 <b>คำอธิบาย:</b> ${explanationText}`;
+            await sendMessage(chatId, msg, "HTML");
           } else {
-            await sendMessage(chatId, "❌ <b>ยังไม่ถูกนะครับ!</b> ลองทบทวนคำใบ้และเฉลยดูใหม่น้า ✌️", "HTML");
+            let msg = `❌ <b>ยังไม่ถูกนะครับ!</b>\n\n`;
+            msg += `✅ <b>คำตอบที่ถูกต้องคือ:</b> ${correctText}`;
+            if (explanationText) msg += `\n\n📖 <b>คำอธิบาย:</b> ${explanationText}`;
+            msg += `\n\n💪 ไม่เป็นไร ทบทวนแล้วลองใหม่ได้เลยครับ ✌️`;
+            await sendMessage(chatId, msg, "HTML");
           }
         }
       }

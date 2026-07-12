@@ -2,26 +2,35 @@ name: Periodic Quiz & Vocabulary Dispatcher
 
 on:
   schedule:
-    # Run every 10 minutes for quiz dispatch
+    # Run every 10 minutes for quiz + vocabulary dispatch
     - cron: '*/10 * * * *'
   workflow_dispatch: # Allow manual trigger
 
 jobs:
   send-quiz:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Trigger Quiz Dispatch
         run: |
-          curl -s -o /dev/null -w "%{http_code}" \
+          HTTP_CODE=$(curl -s -o /tmp/quiz_resp.txt -w "%{http_code}" \
+            --max-time 60 \
             -X POST \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             -H "Content-Type: application/json" \
-            "${{ secrets.VERCEL_API_URL }}/api/send-quiz"
+            "${{ secrets.VERCEL_API_URL }}/api/send-quiz")
+          echo "Quiz dispatch HTTP: $HTTP_CODE"
+          cat /tmp/quiz_resp.txt
+          if [ "$HTTP_CODE" != "200" ]; then exit 1; fi
 
-      - name: Trigger Vocabulary Dispatch (every run = every 10 min, API handles 1h interval)
+      - name: Trigger Vocabulary Dispatch
         run: |
-          curl -s -o /dev/null -w "%{http_code}" \
+          HTTP_CODE=$(curl -s -o /tmp/vocab_resp.txt -w "%{http_code}" \
+            --max-time 60 \
             -X POST \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             -H "Content-Type: application/json" \
-            "${{ secrets.VERCEL_API_URL }}/api/send-vocabulary"
+            "${{ secrets.VERCEL_API_URL }}/api/send-vocabulary")
+          echo "Vocabulary dispatch HTTP: $HTTP_CODE"
+          cat /tmp/vocab_resp.txt
+          if [ "$HTTP_CODE" != "200" ]; then exit 1; fi

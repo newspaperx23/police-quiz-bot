@@ -341,6 +341,8 @@ export async function sendIndividualQuiz(
       await db.collection("active_polls").doc(pollId).set({
         chatId,
         correctOptionId: quiz.correct_option_id,
+        options: quiz.options,
+        explanation: quiz.explanation || "",
         sentAt: new Date(),
         answered: false,
         quizId: quizId || null,

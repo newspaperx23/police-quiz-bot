@@ -39,6 +39,9 @@ export async function sendQuizPoll(
   correctOptionId: number,
   explanation?: string
 ): Promise<string | null> {
+  // NOTE: ใช้ type "regular" แทน "quiz" เพื่อให้ Telegram ส่ง poll_answer webhook
+  // กลับมาหาบอทเมื่อ user ตอบ — Telegram Quiz Poll จะไม่ส่ง poll_answer webhook
+  // บอทเป็นคนตรวจคำตอบเองและแจ้งผลผ่าน sendMessage แทน
   const res = await fetch(`${TELEGRAM_API}/sendPoll`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -46,11 +49,9 @@ export async function sendQuizPoll(
       chat_id: chatId,
       question,
       options: options.map((o) => ({ text: o })),
-      type: "quiz",
+      type: "regular",
       is_anonymous: false,
-      correct_option_id: correctOptionId,
-      explanation: explanation?.slice(0, 200), // Telegram limit
-      explanation_parse_mode: "HTML",
+      allows_multiple_answers: false,
     }),
   });
 
@@ -61,5 +62,5 @@ export async function sendQuizPoll(
   }
 
   const data = await res.json();
-  return data.result?.poll?.id || null;
+  return data.result?.poll?.id?.toString() || null;
 }
