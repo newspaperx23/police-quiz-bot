@@ -148,13 +148,33 @@ export async function sendIndividualQuiz(
             const fullDoc = await selectedDoc.ref.get();
             const data = fullDoc.data();
             if (data) {
-              quiz = {
+              const candidateQuiz: QuizQuestion = {
                 question: data.question,
                 options: data.options,
                 correct_option_id: data.correct_option_id,
                 hint: data.hint,
                 explanation: data.explanation,
               };
+
+              // ─── Verify pool quiz answer (same as realtime gen) ─
+              try {
+                const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+                const verifiedId = await verifyQuizAnswer(openai, candidateQuiz);
+                if (verifiedId >= 0 && verifiedId !== candidateQuiz.correct_option_id) {
+                  console.warn(
+                    `[Pool Verify] Quiz ${selectedDoc.id} had wrong answer: ` +
+                    `stored=${candidateQuiz.correct_option_id}, verified=${verifiedId}. Auto-fixing...`
+                  );
+                  // Auto-fix in Firestore so it won't be wrong again
+                  await selectedDoc.ref.update({ correct_option_id: verifiedId });
+                  candidateQuiz.correct_option_id = verifiedId;
+                }
+              } catch (verifyErr) {
+                console.error(`[Pool Verify] Failed to verify quiz ${selectedDoc.id}:`, verifyErr);
+                // Proceed with stored value if verification fails
+              }
+
+              quiz = candidateQuiz;
               quizId = selectedDoc.id;
               isFromPool = true;
               console.log(`Successfully retrieved quiz ${quizId} from global_quizzes pool for user ${chatId}`);

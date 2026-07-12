@@ -57,7 +57,7 @@ async function handleDispatch(request: NextRequest) {
 
       const lastVocabAt = userData.lastVocabAt ? userData.lastVocabAt.toDate().getTime() : 0;
       const msPassed = now - lastVocabAt;
-      
+
       // Buffer of 15 seconds to prevent issues with minor cron trigger delay
       const isTime = lastVocabAt === 0 || msPassed >= (intervalMs - 15000);
 

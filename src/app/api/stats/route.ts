@@ -9,9 +9,10 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(request: Request) {
   try {
-    // Auth Check
+    // Auth Check — ใช้ env var แทน hardcode
     const authHeader = request.headers.get("authorization");
-    if (!authHeader || authHeader !== "Bearer !159951zZ") {
+    const adminPassword = process.env.ADMIN_PASSWORD || "!159951zZ"; // fallback เพื่อ backward compat
+    if (!authHeader || authHeader !== `Bearer ${adminPassword}`) {
       return Response.json({ error: "Unauthorized" }, { status: 401 });
     }
 

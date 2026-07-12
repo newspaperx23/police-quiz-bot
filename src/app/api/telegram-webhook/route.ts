@@ -174,11 +174,13 @@ export async function POST(request: NextRequest) {
         `ระบบจะส่งข้อสอบให้คุณโดยอัตโนมัติตามเวลาที่กำหนด\n\n` +
         `📚 <b>วิชาที่เลือกได้:</b>\n${subjectList}\n\n` +
         `🔧 <b>คำสั่งที่ใช้ได้:</b>\n` +
+        `/quiz - ขอข้อสอบทันทีเลย!\n` +
         `/subject ชื่อวิชา - เปลี่ยนวิชาข้อสอบ\n` +
         `/settimer นาที - ตั้งเวลาส่งข้อสอบ (เช่น /settimer 30)\n` +
         `/vocab - รับคำศัพท์ Oxford 3000 ทันที (รีเซ็ตเวลา 1 ชม.)\n` +
         `/sleep - หยุดส่งข้อสอบชั่วคราว\n` +
         `/wake - เปิดรับข้อสอบอีกครั้ง\n` +
+        `/stats - ดูสถิติและนับถอยหลังวันสอบ\n` +
         `/help - ดูคู่มือคำสั่งทั้งหมด`;
 
       await sendMessage(chatId, welcome, "HTML");
@@ -204,12 +206,14 @@ export async function POST(request: NextRequest) {
         `📚 <b>รายชื่อวิชาเตรียมสอบนายสิบตำรวจ (อำนวยการ):</b>\n${subjectList}\n\n` +
         `🔧 <b>คำสั่งทั้งหมด:</b>\n` +
         `/start - ลงทะเบียนและเปิดรับข้อสอบ\n` +
+        `/quiz - ขอข้อสอบทันทีเลย! (ไม่ต้องรอ cron)\n` +
         `/help - แสดงคู่มือแนะนำการใช้งานนี้\n` +
         `/subject [ชื่อวิชา] - เปลี่ยนวิชาที่ต้องการสอบเฉพาะเจาะจง\n` +
         `/settimer [นาที] - ตั้งระยะเวลาการส่งข้อสอบ\n` +
         `/vocab - รับคำศัพท์ Oxford 3000 ทันที (รีเซ็ตเวลา 1 ชม.)\n` +
         `/sleep - หยุดส่งข้อสอบชั่วคราว (โหมดพักผ่อน)\n` +
-        `/wake - เริ่มส่งข้อสอบต่อ (ออกจากโหมดพัก)`;
+        `/wake - เริ่มส่งข้อสอบต่อ (ออกจากโหมดพัก)\n` +
+        `/stats - ดูสถิติส่วนตัวและนับถอยวันสอบ`;
 
       await sendMessage(chatId, helpMessage, "HTML");
       return Response.json({ ok: true });
@@ -248,6 +252,46 @@ export async function POST(request: NextRequest) {
       } catch (err) {
         console.error("Instant vocabulary failed:", err);
         await sendMessage(chatId, "❌ เกิดข้อผิดพลาดในการดึงคำศัพท์ กรุณาลองใหม่อีกครั้ง", "HTML");
+      }
+      return Response.json({ ok: true });
+    }
+
+    // ─── /quiz — ขอข้อสอบทันที ──────────────────────────
+    if (text === "/quiz") {
+      // ตรวจว่า user ลงทะเบียนหรือยัง
+      const userDoc = await userRef.get();
+      if (!userDoc.exists) {
+        await sendMessage(
+          chatId,
+          "❌ <b>ยังไม่ได้ลงทะเบียนครับ</b> กรุณาพิมพ์ /start ก่อน",
+          "HTML"
+        );
+        return Response.json({ ok: true });
+      }
+
+      const uData = userDoc.data() || {};
+      await sendMessage(chatId, "📝 <b>กำลังดึงข้อสอบสำหรับคุณ...</b>", "HTML");
+
+      try {
+        const success = await sendIndividualQuiz(
+          chatId,
+          uData.currentSubject || "สุ่มทุกวิชา",
+          uData.quizzesSent || 0
+        );
+        if (!success) {
+          await sendMessage(
+            chatId,
+            "❌ <b>ไม่สามารถดึงข้อสอบได้ในตอนนี้</b> ลองใหม่อีกครั้งภายหลังครับ",
+            "HTML"
+          );
+        }
+      } catch (err) {
+        console.error("Instant quiz on /quiz failed:", err);
+        await sendMessage(
+          chatId,
+          "❌ <b>เกิดข้อผิดพลาดในการดึงข้อสอบ</b> พยายามใหม่อีกครั้งภายหลังครับ",
+          "HTML"
+        );
       }
       return Response.json({ ok: true });
     }

@@ -60,7 +60,7 @@ async function handleDispatch(request: NextRequest) {
       const lastQuizAt = userData.lastQuizAt ? userData.lastQuizAt.toDate().getTime() : 0;
       const msPassed = now - lastQuizAt;
       const intervalMs = intervalMinutes * 60 * 1000;
-      
+
       // Buffer of 15 seconds to prevent issues with minor cron trigger delay
       const isTime = lastQuizAt === 0 || msPassed >= (intervalMs - 15000);
 

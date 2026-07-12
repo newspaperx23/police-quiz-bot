@@ -8,11 +8,12 @@ import OpenAI from "openai";
  */
 export async function sendIndividualVocabulary(chatId: string): Promise<boolean> {
   try {
-    // ─── Fetch Recent Vocabulary to Prevent Repeats ────
+    // ─── Fetch Recent Vocabulary (per-user) to Prevent Repeats ────
     let pastWords: string[] = [];
     try {
       const historySnapshot = await db
         .collection("vocabulary_history")
+        .where("chatId", "==", chatId)  // ตรวจเฉพาะของ user นี้เท่านั้น
         .orderBy("sentAt", "desc")
         .limit(30)
         .get();
