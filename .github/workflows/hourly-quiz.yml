@@ -22,15 +22,3 @@ jobs:
           echo "Quiz dispatch HTTP: $HTTP_CODE"
           cat /tmp/quiz_resp.txt
           if [ "$HTTP_CODE" != "200" ]; then exit 1; fi
-
-      - name: Trigger Vocabulary Dispatch
-        run: |
-          HTTP_CODE=$(curl -s -o /tmp/vocab_resp.txt -w "%{http_code}" \
-            --max-time 60 \
-            -X POST \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            -H "Content-Type: application/json" \
-            "${{ secrets.VERCEL_API_URL }}/api/send-vocabulary")
-          echo "Vocabulary dispatch HTTP: $HTTP_CODE"
-          cat /tmp/vocab_resp.txt
-          if [ "$HTTP_CODE" != "200" ]; then exit 1; fi
