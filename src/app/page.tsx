@@ -21,6 +21,7 @@ interface StatsData {
   dailyCounts: Record<string, number>;
   totalQuizzesInPool?: number;
   subjectPoolCounts?: Record<string, number>;
+  totalVocabInPool?: number;
 }
 export default function DashboardPage() {
   const [stats, setStats] = useState<StatsData | null>(null);
@@ -121,6 +122,86 @@ export default function DashboardPage() {
       setBulkStatusText(`❌ เกิดข้อผิดพลาดกลางคัน: ${err instanceof Error ? err.message : "Unknown error"}`);
     } finally {
       setBulkGenerating(false);
+    }
+  };
+
+  const [generatingVocab, setGeneratingVocab] = useState(false);
+  const [vocabGenerationMsg, setVocabGenerationMsg] = useState<string | null>(null);
+
+  const generateVocabPool = async (count: number) => {
+    try {
+      setGeneratingVocab(true);
+      setVocabGenerationMsg(null);
+      const savedPassword = localStorage.getItem("admin_password") || password;
+      const res = await fetch(`/api/generate-vocab-pool?count=${count}`, {
+        headers: {
+          Authorization: `Bearer ${savedPassword}`
+        }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to generate");
+      setVocabGenerationMsg(`✅ เจนคำศัพท์ใหม่ลงคลังสำเร็จ +${data.savedCount} คำ!`);
+      // Refresh stats
+      const statsRes = await fetch(`/api/stats?t=${Date.now()}`, {
+        headers: {
+          Authorization: `Bearer ${savedPassword}`
+        }
+      });
+      if (statsRes.ok) {
+        const statsData = await statsRes.json();
+        setStats(statsData);
+      }
+    } catch (err) {
+      setVocabGenerationMsg(`❌ เกิดข้อผิดพลาด: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally {
+      setGeneratingVocab(false);
+    }
+  };
+
+  const [bulkGeneratingVocab, setBulkGeneratingVocab] = useState(false);
+  const [bulkVocabProgress, setBulkVocabProgress] = useState(0);
+  const [bulkVocabStatusText, setBulkVocabStatusText] = useState<string | null>(null);
+  const [showBulkVocabConfirm, setShowBulkVocabConfirm] = useState(false);
+
+  const startBulkVocabGeneration = async () => {
+    setBulkGeneratingVocab(true);
+    setBulkVocabStatusText("เริ่มต้นระบบการออกคำศัพท์จำนวนมาก...");
+    setBulkVocabProgress(0);
+    let totalSaved = 0;
+
+    try {
+      const savedPassword = localStorage.getItem("admin_password") || password;
+      const totalBatches = 5; // 5 batches * 10 words = 50 words
+      for (let batch = 1; batch <= totalBatches; batch++) {
+        setBulkVocabStatusText(`กำลังออกคำศัพท์ Oxford 3000 ล็อตใหม่ (รอบที่ ${batch}/${totalBatches})...`);
+        const res = await fetch(`/api/generate-vocab-pool?count=10`, {
+          headers: {
+            Authorization: `Bearer ${savedPassword}`
+          }
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || `ล้มเหลวในการออกคำศัพท์รอบที่ ${batch}`);
+        }
+        totalSaved += data.savedCount || 0;
+        setBulkVocabProgress(Math.round((batch / totalBatches) * 100));
+      }
+
+      setBulkVocabStatusText(`🎉 เจนคำศัพท์ Oxford 3000 สำเร็จ! เพิ่มเข้าไปทั้งหมด +${totalSaved} คำเรียบร้อยครับ`);
+      // Refresh stats
+      const statsRes = await fetch(`/api/stats?t=${Date.now()}`, {
+        headers: {
+          Authorization: `Bearer ${savedPassword}`
+        }
+      });
+      if (statsRes.ok) {
+        const statsData = await statsRes.json();
+        setStats(statsData);
+      }
+    } catch (err) {
+      setBulkVocabStatusText(`❌ เกิดข้อผิดพลาดกลางคัน: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally {
+      setBulkGeneratingVocab(false);
     }
   };
 
@@ -824,6 +905,94 @@ export default function DashboardPage() {
           </div>
         </section>
 
+        {/* ─── Vocabulary Pool Section ──────────────── */}
+        <section className="recent-section" id="vocab-pool" style={{ marginBottom: "2rem" }}>
+          <div className="card">
+            <div className="card__header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+              <div>
+                <h2 className="card__title" style={{ fontSize: "1.25rem", fontWeight: "600", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span>📖</span> คลังคำศัพท์ส่วนกลาง (Global Vocabulary Pool)
+                </h2>
+                <p className="card__subtitle" style={{ fontSize: "13px", color: "rgba(255, 255, 255, 0.5)", marginTop: "4px" }}>
+                  มีคำศัพท์ Oxford 3000 ในคลังทั้งหมด <strong style={{ color: "#0ea5e9" }}>{stats.totalVocabInPool || 0}</strong> คำ (ดึงส่งสอบรายชั่วโมงแบบไม่ซ้ำคนรับ)
+                </p>
+              </div>
+            </div>
+            <div className="card__body">
+              {/* Action row to generate vocab pool */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "15px", background: "rgba(255, 255, 255, 0.01)", padding: "15px", borderRadius: "8px", border: "1px solid rgba(255, 255, 255, 0.04)" }}>
+                {/* Row 1: Single/Batch Generation */}
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: "14px", fontWeight: "500", color: "rgba(255, 255, 255, 0.8)" }}>⚡ สั่ง AI ออกคำศัพท์เพิ่มลงคลัง:</span>
+                  <button
+                    onClick={() => generateVocabPool(5)}
+                    disabled={generatingVocab || bulkGeneratingVocab}
+                    style={{
+                      background: "linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)",
+                      color: "#ffffff",
+                      border: "none",
+                      padding: "8px 16px",
+                      borderRadius: "6px",
+                      fontWeight: "600",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      opacity: (generatingVocab || bulkGeneratingVocab) ? 0.7 : 1
+                    }}
+                  >
+                    {generatingVocab ? "กำลังออกคำศัพท์..." : "สั่ง AI ออกคำศัพท์เพิ่ม (+5 คำ)"}
+                  </button>
+                  {vocabGenerationMsg && (
+                    <span style={{ fontSize: "14px", marginLeft: "10px", color: vocabGenerationMsg.includes("สำเร็จ") ? "#10b981" : "#ef4444" }}>{vocabGenerationMsg}</span>
+                  )}
+                </div>
+
+                {/* Row 2: Bulk Vocab Generation */}
+                <div style={{ borderTop: "1px solid rgba(255, 255, 255, 0.05)", paddingTop: "15px", display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: "14px", fontWeight: "500", color: "rgba(255, 255, 255, 0.8)" }}>🔥 เจนคำศัพท์ชุดใหญ่:</span>
+                  <button
+                    onClick={() => setShowBulkVocabConfirm(true)}
+                    disabled={generatingVocab || bulkGeneratingVocab}
+                    style={{
+                      background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                      color: "#ffffff",
+                      border: "none",
+                      padding: "8px 16px",
+                      borderRadius: "6px",
+                      fontWeight: "600",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      opacity: (generatingVocab || bulkGeneratingVocab) ? 0.7 : 1
+                    }}
+                  >
+                    {bulkGeneratingVocab ? "กำลังรันระบบ..." : "สั่ง AI ออกคำศัพท์เพิ่ม (+50 คำ)"}
+                  </button>
+                </div>
+
+                {/* Progress Bar for Bulk Vocab Generation */}
+                {bulkVocabStatusText && (
+                  <div style={{ marginTop: "5px", background: "rgba(255, 255, 255, 0.02)", padding: "12px 15px", borderRadius: "8px", border: "1px solid rgba(255, 255, 255, 0.05)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px", fontSize: "13px" }}>
+                      <span style={{ color: "#d4d4d4" }}>{bulkVocabStatusText}</span>
+                      {bulkGeneratingVocab && <span style={{ fontWeight: "bold", color: "#10b981" }}>{bulkVocabProgress}%</span>}
+                    </div>
+                    <div style={{ width: "100%", height: "8px", background: "rgba(255, 255, 255, 0.1)", borderRadius: "4px", overflow: "hidden" }}>
+                      <div 
+                        style={{ 
+                          width: `${bulkVocabProgress}%`, 
+                          height: "100%", 
+                          background: "linear-gradient(90deg, #0ea5e9, #10b981)", 
+                          borderRadius: "4px",
+                          transition: "width 0.4s ease"
+                        }} 
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* ─── Recent Quizzes ────────────────── */}
         <section className="recent-section" id="recent-quizzes">
           <div className="card">
@@ -969,6 +1138,78 @@ export default function DashboardPage() {
               </button>
               <button
                 onClick={() => setShowBulkConfirm(false)}
+                style={{
+                  background: "rgba(255, 255, 255, 0.05)",
+                  color: "#ffffff",
+                  border: "1px solid rgba(255, 255, 255, 0.1)",
+                  padding: "10px 20px",
+                  borderRadius: "8px",
+                  fontWeight: "600",
+                  cursor: "pointer"
+                }}
+              >
+                ยกเลิก
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Bulk Vocab Confirm Modal ────────────────── */}
+      {showBulkVocabConfirm && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: "rgba(0, 0, 0, 0.8)",
+          backdropFilter: "blur(6px)",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          zIndex: 9999,
+        }}>
+          <div style={{
+            background: "#121318",
+            border: "1px solid rgba(255, 255, 255, 0.08)",
+            borderRadius: "16px",
+            padding: "30px 25px",
+            maxWidth: "420px",
+            width: "90%",
+            boxShadow: "0 20px 40px rgba(0, 0, 0, 0.6)",
+            textAlign: "center"
+          }}>
+            <div style={{ fontSize: "40px", marginBottom: "15px" }}>📖</div>
+            <h3 style={{ fontSize: "18px", fontWeight: "600", color: "#ffffff", marginBottom: "10px" }}>
+              ยืนยันการออกคำศัพท์ชุดใหญ่
+            </h3>
+            <p style={{ fontSize: "13px", color: "rgba(255, 255, 255, 0.6)", lineHeight: "1.6", marginBottom: "24px" }}>
+              คุณต้องการสั่งให้ AI ออกคำศัพท์ระดับ Oxford 3000 เพิ่มลงคลังจำนวน 50 คำใช่หรือไม่?<br/>
+              <span style={{ color: "#0ea5e9", display: "block", marginTop: "8px", fontWeight: "500" }}>
+                * ระบบจะทำงานทั้งหมด 5 รอบ รอบละ 10 คำ (รวมเป็น 50 คำ) เพื่อประมวลผลคำศัพท์อย่างต่อเนื่องโดยไม่ติดขัด
+              </span>
+            </p>
+            <div style={{ display: "flex", gap: "10px", justifyContent: "center" }}>
+              <button
+                onClick={() => {
+                  setShowBulkVocabConfirm(false);
+                  startBulkVocabGeneration();
+                }}
+                style={{
+                  background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                  color: "#ffffff",
+                  border: "none",
+                  padding: "10px 20px",
+                  borderRadius: "8px",
+                  fontWeight: "600",
+                  cursor: "pointer"
+                }}
+              >
+                ยืนยันเริ่มออกคำศัพท์
+              </button>
+              <button
+                onClick={() => setShowBulkVocabConfirm(false)}
                 style={{
                   background: "rgba(255, 255, 255, 0.05)",
                   color: "#ffffff",

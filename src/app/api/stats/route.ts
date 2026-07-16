@@ -123,6 +123,15 @@ export async function GET(request: Request) {
       subjectPoolCounts[key] = countSub.data().count;
     }
 
+    // ─── Vocabulary Pool Stats ────────────────────────
+    let totalVocabInPool = 0;
+    try {
+      const vocabCountSnapshot = await db.collection("global_vocabulary").count().get();
+      totalVocabInPool = vocabCountSnapshot.data().count;
+    } catch (vocabCountErr) {
+      console.error("Failed to count global_vocabulary:", vocabCountErr);
+    }
+
     return Response.json(
       {
         totalUsers,
@@ -137,6 +146,7 @@ export async function GET(request: Request) {
         dailyCounts,
         totalQuizzesInPool,
         subjectPoolCounts,
+        totalVocabInPool,
       },
       {
         headers: {
